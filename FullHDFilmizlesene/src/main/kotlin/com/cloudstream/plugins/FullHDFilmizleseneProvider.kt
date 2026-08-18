@@ -73,7 +73,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
         )
         val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yapim-yili/'], .film-bilgisi li")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val score = doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(1000)?.toInt()
+        val score = Score.from10(doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/kategori/'], a[href*='/tur/']").map { it.text().trim() }
 
         return newMovieLoadResponse(title, url, TvType.Movie, url) {

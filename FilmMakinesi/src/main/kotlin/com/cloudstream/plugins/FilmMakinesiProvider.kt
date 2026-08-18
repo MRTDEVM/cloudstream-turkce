@@ -81,7 +81,7 @@ class FilmMakinesiProvider : MainAPI() {
         )
         val description = doc.selectFirst(".entry-content p, .overview, .film-story")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/release-year/'], a[href*='/yil/']")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val score = doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(1000)?.toInt()
+        val score = Score.from10(doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/genre/'], a[href*='/kategori/']").map { it.text().trim() }
 
         val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .episodes").isNotEmpty()
