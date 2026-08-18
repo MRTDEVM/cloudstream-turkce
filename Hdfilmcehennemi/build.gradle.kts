@@ -1,5 +1,18 @@
-plugins {
-    id("com.android.library")
-    id("kotlin-android")
-    id("com.lagradost.cloudstream3.gradle")
+// Use an integer for version numbers
+version = 1
+
+cloudstream {
+    description = "HDFilmCehennemi Turkce Dublaj ve Altyazili Film / Dizi Saglayicisi"
+    authors = listOf("CloudStream User")
+    status = 1
+    tvTypes = listOf("Movie", "TvSeries")
+    language = "tr"
+    iconUrl = "https://www.hdfilmcehennemi.nl/favicon.ico"
 }
+
+android {
+    defaultConfig {
+        minSdk = 21
+    }
+}
+

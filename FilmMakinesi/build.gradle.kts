@@ -1,5 +1,18 @@
-plugins {
-    id("com.android.library")
-    id("kotlin-android")
-    id("com.lagradost.cloudstream3.gradle")
+// Use an integer for version numbers
+version = 1
+
+cloudstream {
+    description = "FilmMakinesi Turkce Film ve Dizi Saglayicisi"
+    authors = listOf("CloudStream User")
+    status = 1
+    tvTypes = listOf("Movie", "TvSeries")
+    language = "tr"
+    iconUrl = "https://filmmakinesi.to/favicon.ico"
 }
+
+android {
+    defaultConfig {
+        minSdk = 21
+    }
+}
+

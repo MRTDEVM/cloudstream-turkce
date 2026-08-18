@@ -1,5 +1,18 @@
-plugins {
-    id("com.android.library")
-    id("kotlin-android")
-    id("com.lagradost.cloudstream3.gradle")
+// Use an integer for version numbers
+version = 1
+
+cloudstream {
+    description = "FullHDFilmizlesene Film Saglayicisi"
+    authors = listOf("CloudStream User")
+    status = 1
+    tvTypes = listOf("Movie")
+    language = "tr"
+    iconUrl = "https://www.fullhdfilmizlesene.now/favicon.ico"
 }
+
+android {
+    defaultConfig {
+        minSdk = 21
+    }
+}
+
