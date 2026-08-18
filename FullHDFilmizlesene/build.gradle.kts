@@ -1,15 +1,17 @@
-import com.lagradost.cloudstream3.gradle.CloudstreamExtension
-import me.felin.gradle.plugins.cloudstream.CloudstreamPlugin
-
-plugins {
-    alias(libs.plugins.cloudstream)
-}
+// Use an integer for version numbers
+version = 6
 
 cloudstream {
-    setLanguage("tr")
-    setAuthors(listOf("Antigravity"))
-    setStatus(CloudstreamPlugin.STATUS_WORKING)
-    setTypes(listOf(CloudstreamPlugin.TYPE_MOVIE))
+    description = "FullHDFilmizlesene Turkce Film Saglayicisi"
+    authors = listOf("CloudStream User")
+    status = 1
+    tvTypes = listOf("Movie")
+    language = "tr"
+    iconUrl = "https://www.fullhdfilmizlesene.now/favicon.ico"
+}
 
-    version = 6
+android {
+    defaultConfig {
+        minSdk = 21
+    }
 }
