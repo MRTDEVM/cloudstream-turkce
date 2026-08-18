@@ -10,7 +10,7 @@
 
 Android cihazınızda CloudStream yüklüyse, aşağıdaki bağlantı üzerinden depoyu doğrudan uygulamaya ekleyebilirsiniz:
 
-[👉 CloudStream'e Otomatik Ekle (Tek Tık)](cloudstreamrepo://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/plugins.json)
+[👉 CloudStream'e Otomatik Ekle (Tek Tık)](cloudstreamrepo://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/main/repo.json)
 
 ---
 
@@ -23,7 +23,7 @@ Android TV veya el ile kurulum için:
 3. Aşağıdaki bağlantıyı **Depo URL** kutucuğuna yapıştırın:
 
 ```
-https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/plugins.json
+https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/main/repo.json
 ```
 
 ---
