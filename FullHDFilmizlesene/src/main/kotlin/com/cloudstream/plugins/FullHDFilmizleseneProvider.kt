@@ -13,9 +13,8 @@ class FullHDFilmizleseneProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "" to "Son Eklenen Filmler",
-        "film-arsivi/" to "Film Arsivi",
         "en-cok-izlenen-filmler/" to "En Cok Izlenenler",
-        "film-izle/turkce-dublaj-filmler/" to "Turkce Dublaj Filmler"
+        "film-arsivi/" to "Film Arsivi"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -26,9 +25,9 @@ class FullHDFilmizleseneProvider : MainAPI() {
         }
 
         val doc = app.get(url).document
-        val home = doc.select("li.film, .film-kutu, .movie-item, article.film").mapNotNull {
+        val home = doc.select(".film, .film-title, li.film").mapNotNull {
             it.toSearchResult()
-        }
+        }.distinctBy { it.url }
 
         return newHomePageResponse(
             list = HomePageList(
@@ -41,12 +40,18 @@ class FullHDFilmizleseneProvider : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val link = this.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = this.selectFirst(".film-adi, .title, h2, h3")?.text()?.trim()
-            ?: link.attr("title").trim()
+        val linkElem = this.selectFirst("a[href]") ?: return null
+        val href = fixUrl(linkElem.attr("href"))
+        if (href == mainUrl || href.endsWith("/#") || href.contains("kategori/") || href.contains("tur/")) return null
+
+        val title = this.selectFirst(".film-title, .title, h2, h3")?.text()?.trim()
+            ?.ifEmpty { null }
+            ?: linkElem.attr("title").trim().ifEmpty { null }
+            ?: return null
+
         val posterUrl = fixUrlNull(
             this.selectFirst("img")?.attr("data-src")
+                ?.ifEmpty { null }
                 ?: this.selectFirst("img")?.attr("src")
         )
 
@@ -56,22 +61,26 @@ class FullHDFilmizleseneProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
+        val searchUrl = "$mainUrl/arama/$query/"
         val doc = app.get(searchUrl).document
-
-        return doc.select("li.film, .film-kutu, .movie-item, article").mapNotNull {
+        return doc.select(".film, .film-title, li.film").mapNotNull {
             it.toSearchResult()
-        }
+        }.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
-        val title = doc.selectFirst("h1.film-adi, h1, .movie-title")?.text()?.trim() ?: ""
+
+        val title = doc.selectFirst("h1, .film-title, .title")?.text()?.trim()
+            ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
+            ?: "Film"
+
         val posterUrl = fixUrlNull(
-            doc.selectFirst(".film-afis img, .poster img, .movie-poster img")?.attr("data-src")
+            doc.selectFirst("meta[property='og:image']")?.attr("content")
+                ?: doc.selectFirst(".film-afis img, .poster img, .movie-poster img")?.attr("data-src")
                 ?: doc.selectFirst(".film-afis img, .poster img, .movie-poster img")?.attr("src")
         )
-        val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story")?.text()?.trim()
+        val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story, .film-story")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yapim-yili/'], .film-bilgisi li")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/kategori/'], a[href*='/tur/']").map { it.text().trim() }
@@ -92,25 +101,17 @@ class FullHDFilmizleseneProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val doc = app.get(data).document
-        val iframes = mutableListOf<String>()
 
+        val iframes = mutableListOf<String>()
         doc.select("iframe[src], iframe[data-src]").forEach {
             val src = it.attr("src").ifEmpty { it.attr("data-src") }
             if (src.isNotEmpty()) iframes.add(fixUrl(src))
         }
 
-        doc.select("[data-source], [data-frame], .kaynaklar a").forEach {
-            val raw = it.attr("data-source").ifEmpty { it.attr("data-frame") }
-            if (raw.isNotEmpty()) {
-                if (raw.startsWith("http")) iframes.add(raw)
-                else if (raw.startsWith("//")) iframes.add("https:$raw")
-            }
+        for (sourceUrl in iframes.distinct()) {
+            loadExtractor(sourceUrl, subtitleCallback, callback)
         }
 
-        for (source in iframes.distinct()) {
-            loadExtractor(source, subtitleCallback, callback)
-        }
-
-        return iframes.isNotEmpty()
+        return true
     }
 }

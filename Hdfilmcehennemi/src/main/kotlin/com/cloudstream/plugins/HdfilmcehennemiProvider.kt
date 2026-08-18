@@ -26,9 +26,9 @@ class HdfilmcehennemiProvider : MainAPI() {
         }
 
         val doc = app.get(url).document
-        val home = doc.select("div.poster, div.poster-media, div.card-body, a.poster").mapNotNull {
+        val home = doc.select("a.poster, div.poster, div.mini-poster, .poster-wrapper").mapNotNull {
             it.toSearchResult()
-        }
+        }.distinctBy { it.url }
 
         return newHomePageResponse(
             list = HomePageList(
@@ -41,16 +41,23 @@ class HdfilmcehennemiProvider : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val linkElem = this.selectFirst("a[href]") ?: (if (this.tagName() == "a") this else null) ?: return null
-        val title = this.selectFirst(".poster-title, .card-title, h2, h3, .title")?.text()?.trim()
-            ?: linkElem.attr("title").trim()
+        val linkElem = if (this.tagName() == "a") this else this.selectFirst("a[href]") ?: return null
         val href = fixUrl(linkElem.attr("href"))
+        if (href == mainUrl || href.endsWith("/#") || href.contains("category/") || href.contains("/tur/")) return null
+
+        val title = this.selectFirst(".poster-title, .mini-poster-title, .title")?.text()?.trim()
+            ?.ifEmpty { null }
+            ?: linkElem.attr("title").trim().ifEmpty { null }
+            ?: return null
+
         val posterUrl = fixUrlNull(
-            this.selectFirst("img")?.attr("data-src")
-                ?: this.selectFirst("img")?.attr("src")
+            this.selectFirst("img")?.attr("src")
+                ?.ifEmpty { null }
+                ?: this.selectFirst("img")?.attr("data-src")
+                ?: this.selectFirst("img")?.attr("srcset")?.split(" ")?.firstOrNull()
         )
 
-        val isTvSeries = href.contains("/dizi/") || this.selectFirst(".badge-dizi, .is-series") != null
+        val isTvSeries = href.contains("/dizi/") || this.selectFirst(".badge-dizi, .is-series, .mini-poster-meta")?.text()?.contains("Dizi", ignoreCase = true) == true
 
         return if (isTvSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
@@ -64,22 +71,25 @@ class HdfilmcehennemiProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/search/index.php?s=$query"
+        val searchUrl = "$mainUrl/search/$query/"
         val doc = app.get(searchUrl).document
-
-        return doc.select("div.poster, div.poster-media, div.search-result, .card").mapNotNull {
+        return doc.select("a.poster, div.poster, div.mini-poster").mapNotNull {
             it.toSearchResult()
-        }
+        }.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
-        val title = doc.selectFirst("h1, .movie-title, .entry-title")?.text()?.trim() ?: ""
+
+        val title = doc.selectFirst("h1, .movie-title, .title")?.text()?.trim()
+            ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
+            ?: "Film"
+
         val posterUrl = fixUrlNull(
-            doc.selectFirst(".poster-media img, .movie-poster img, .poster img")?.attr("data-src")
+            doc.selectFirst("meta[property='og:image']")?.attr("content")
                 ?: doc.selectFirst(".poster-media img, .movie-poster img, .poster img")?.attr("src")
         )
-        val description = doc.selectFirst(".movie-story, .story, .overview, p.description")?.text()?.trim()
+        val description = doc.selectFirst(".movie-story, .story, .overview, p.description, .entry-content")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yil/'], span.year, .release-date")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }
@@ -147,9 +157,47 @@ class HdfilmcehennemiProvider : MainAPI() {
         }
 
         for (sourceUrl in iframes.distinct()) {
-            loadExtractor(sourceUrl, subtitleCallback, callback)
+            try {
+                if (sourceUrl.contains("hdfilmcehennemi") || sourceUrl.contains("rapid") || sourceUrl.contains("closeload") || sourceUrl.contains("playmix")) {
+                    val embedDoc = app.get(sourceUrl, referer = data).text
+                    
+                    // Direct HLS / Video links
+                    val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
+                    m3u8Regex.findAll(embedDoc).forEach { match ->
+                        val videoUrl = match.value.replace("\\/", "/")
+                        val isM3u8 = videoUrl.contains(".m3u8") || videoUrl.contains(".txt")
+                        callback.invoke(
+                            ExtractorLink(
+                                source = name,
+                                name = name,
+                                url = videoUrl,
+                                referer = sourceUrl,
+                                quality = Qualities.P1080.value,
+                                isM3u8 = isM3u8
+                            )
+                        )
+                    }
+
+                    // VTT Subtitles
+                    val vttRegex = Regex("""\{"file":"([^"]+\.vtt[^"]*)","kind":"captions","label":"([^"]+)"\}""")
+                    vttRegex.findAll(embedDoc).forEach { match ->
+                        val subUrl = match.groupValues[1].replace("\\/", "/")
+                        val subLang = match.groupValues[2]
+                        subtitleCallback.invoke(
+                            SubtitleFile(
+                                lang = subLang,
+                                url = subUrl
+                            )
+                        )
+                    }
+                } else {
+                    loadExtractor(sourceUrl, subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                // Ignore failure for individual embed
+            }
         }
 
-        return iframes.isNotEmpty()
+        return true
     }
 }

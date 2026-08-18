@@ -13,9 +13,9 @@ class FilmMakinesiProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "" to "Son Eklenen Filmler",
-        "tur/filmler/" to "Filmler",
-        "tur/diziler/" to "Diziler",
-        "en-cok-izlenen-filmler/" to "En Cok Izlenenler"
+        "yabanci-dizi-izle-1/" to "Son Eklenen Diziler",
+        "en-cok-izlenen-filmler/" to "Cok Izlenen Filmler",
+        "film-arsivi/" to "Film Arsivi"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -26,9 +26,9 @@ class FilmMakinesiProvider : MainAPI() {
         }
 
         val doc = app.get(url).document
-        val home = doc.select("article.item, div.movie-box, .film-kutu, .poster-media").mapNotNull {
-            it.toSearchResponse()
-        }
+        val home = doc.select(".item, .content-article, div.thumbnail").mapNotNull {
+            it.toSearchResult()
+        }.distinctBy { it.url }
 
         return newHomePageResponse(
             list = HomePageList(
@@ -40,17 +40,23 @@ class FilmMakinesiProvider : MainAPI() {
         )
     }
 
-    private fun Element.toSearchResponse(): SearchResponse? {
-        val link = this.selectFirst("a[href]") ?: return null
-        val href = fixUrl(link.attr("href"))
-        val title = this.selectFirst("h2, h3, .movie-title, .title")?.text()?.trim()
-            ?: link.attr("title").trim()
+    private fun Element.toSearchResult(): SearchResponse? {
+        val linkElem = this.selectFirst("a[href]") ?: return null
+        val href = fixUrl(linkElem.attr("href"))
+        if (href == mainUrl || href.endsWith("/#") || href.contains("kategori/") || href.contains("tur/")) return null
+
+        val title = this.selectFirst(".item-title, .title, h2, h3")?.text()?.trim()
+            ?.ifEmpty { null }
+            ?: linkElem.attr("title").trim().ifEmpty { null }
+            ?: return null
+
         val posterUrl = fixUrlNull(
             this.selectFirst("img")?.attr("data-src")
+                ?.ifEmpty { null }
                 ?: this.selectFirst("img")?.attr("src")
         )
 
-        val isTvSeries = href.contains("/dizi/") || this.select(".is-series, .badge-dizi").isNotEmpty()
+        val isTvSeries = href.contains("/dizi/") || this.selectFirst(".item-season, .item-ep") != null
 
         return if (isTvSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
@@ -66,17 +72,20 @@ class FilmMakinesiProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=$query"
         val doc = app.get(searchUrl).document
-
-        return doc.select("article.item, div.movie-box, .film-kutu").mapNotNull {
-            it.toSearchResponse()
-        }
+        return doc.select(".item, .content-article, div.thumbnail").mapNotNull {
+            it.toSearchResult()
+        }.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
-        val title = doc.selectFirst("h1.entry-title, h1, .movie-title")?.text()?.trim() ?: ""
+
+        val title = doc.selectFirst("h1, .movie-title, .title")?.text()?.trim()
+            ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
+            ?: "Film"
+
         val posterUrl = fixUrlNull(
-            doc.selectFirst(".movie-poster img, .poster img, .entry-content img")?.attr("data-src")
+            doc.selectFirst("meta[property='og:image']")?.attr("content")
                 ?: doc.selectFirst(".movie-poster img, .poster img, .entry-content img")?.attr("src")
         )
         val description = doc.selectFirst(".entry-content p, .overview, .film-story")?.text()?.trim()
@@ -128,25 +137,60 @@ class FilmMakinesiProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val doc = app.get(data).document
-        val iframes = mutableListOf<String>()
 
+        val iframes = mutableListOf<String>()
         doc.select("iframe[src], iframe[data-src]").forEach {
             val src = it.attr("src").ifEmpty { it.attr("data-src") }
             if (src.isNotEmpty()) iframes.add(fixUrl(src))
         }
 
-        doc.select("[data-source], .sources-list button").forEach {
-            val raw = it.attr("data-source").ifEmpty { it.attr("data-url") }
-            if (raw.isNotEmpty()) {
-                if (raw.startsWith("http")) iframes.add(raw)
-                else if (raw.startsWith("//")) iframes.add("https:$raw")
+        doc.select(".player-section [data-src], .player-section [data-url]").forEach {
+            val src = it.attr("data-src").ifEmpty { it.attr("data-url") }
+            if (src.isNotEmpty()) iframes.add(fixUrl(src))
+        }
+
+        for (sourceUrl in iframes.distinct()) {
+            try {
+                if (sourceUrl.contains("closeload") || sourceUrl.contains("filmmakinesi") || sourceUrl.contains("playmix") || sourceUrl.contains("rapid")) {
+                    val embedDoc = app.get(sourceUrl, referer = data).text
+
+                    // Direct HLS / Video links
+                    val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
+                    m3u8Regex.findAll(embedDoc).forEach { match ->
+                        val videoUrl = match.value.replace("\\/", "/")
+                        val isM3u8 = videoUrl.contains(".m3u8") || videoUrl.contains(".txt")
+                        callback.invoke(
+                            ExtractorLink(
+                                source = name,
+                                name = name,
+                                url = videoUrl,
+                                referer = sourceUrl,
+                                quality = Qualities.P1080.value,
+                                isM3u8 = isM3u8
+                            )
+                        )
+                    }
+
+                    // VTT Subtitles
+                    val vttRegex = Regex("""\{"file":"([^"]+\.vtt[^"]*)","kind":"captions","label":"([^"]+)"\}""")
+                    vttRegex.findAll(embedDoc).forEach { match ->
+                        val subUrl = match.groupValues[1].replace("\\/", "/")
+                        val subLang = match.groupValues[2]
+                        subtitleCallback.invoke(
+                            SubtitleFile(
+                                lang = subLang,
+                                url = subUrl
+                            )
+                        )
+                    }
+                } else {
+                    loadExtractor(sourceUrl, subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                // Ignore failure for individual embed
             }
         }
 
-        for (source in iframes.distinct()) {
-            loadExtractor(source, subtitleCallback, callback)
-        }
-
-        return iframes.isNotEmpty()
+        return true
     }
 }
