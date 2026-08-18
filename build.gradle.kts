@@ -29,6 +29,10 @@ subprojects {
     apply(plugin = "kotlin-android")
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
+    cloudstream {
+        setRepo("https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds")
+    }
+
     android {
         compileSdk = 34
 
@@ -43,7 +47,7 @@ subprojects {
         }
 
         kotlinOptions {
-           *vmTarget = "1.8"
+            jvmTarget = "1.8"
             freeCompilerArgs = freeCompilerArgs + "-Xopt-in=kotlin.RequiresOptIn"
         }
     }
