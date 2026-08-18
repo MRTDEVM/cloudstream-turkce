@@ -13,19 +13,20 @@ class FullHDFilmizleseneProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "" to "Son Eklenen Filmler",
-        "en-cok-izlenen-filmler/" to "En Cok Izlenenler",
-        "film-arsivi/" to "Film Arsivi"
+        "filmizle/1080p-filmler-2" to "1080p Filmler",
+        "filmizle/imdb-puani-yuksek-filmler" to "IMDb Puani Yuksek",
+        "filmizle/turkce-dublaj-filmler-1" to "Turkce Dublaj Filmler"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) {
             if (request.data.isEmpty()) mainUrl else "$mainUrl/${request.data}"
         } else {
-            if (request.data.isEmpty()) "$mainUrl/page/$page/" else "$mainUrl/${request.data}page/$page/"
+            if (request.data.isEmpty()) "$mainUrl/page/$page/" else "$mainUrl/${request.data}/page/$page/"
         }
 
         val doc = app.get(url).document
-        val home = doc.select(".film, .film-title, li.film").mapNotNull {
+        val home = doc.select(".film, .film-title, li.film, div.poster").mapNotNull {
             it.toSearchResult()
         }.distinctBy { it.url }
 
@@ -40,7 +41,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val linkElem = this.selectFirst("a[href]") ?: return null
+        val linkElem = if (this.tagName() == "a") this else this.selectFirst("a[href]") ?: return null
         val href = fixUrl(linkElem.attr("href"))
         if (href == mainUrl || href.endsWith("/#") || href.contains("kategori/") || href.contains("tur/")) return null
 
@@ -61,9 +62,9 @@ class FullHDFilmizleseneProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/arama/$query/"
+        val searchUrl = "$mainUrl/arama/$query"
         val doc = app.get(searchUrl).document
-        return doc.select(".film, .film-title, li.film").mapNotNull {
+        return doc.select(".film, .film-title, li.film, div.poster").mapNotNull {
             it.toSearchResult()
         }.distinctBy { it.url }
     }
@@ -126,7 +127,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
 
         for (sourceUrl in iframes.distinct()) {
             try {
-                if (sourceUrl.contains("fullhdfilmizlesene") || sourceUrl.contains("atom") || sourceUrl.contains("playmix") || sourceUrl.contains("closeload")) {
+                if (sourceUrl.contains("fullhdfilmizlesene") || sourceUrl.contains("atom") || sourceUrl.contains("playmix") || sourceUrl.contains("closeload") || sourceUrl.contains("rapid")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     val m3u8s = m3u8Regex.findAll(embedDoc).map { it.value.replace("\\/", "/") }.distinct().toList()
@@ -144,7 +145,19 @@ class FullHDFilmizleseneProvider : MainAPI() {
                             headers = headers
                         )
                         if (links.isNotEmpty()) {
-                            links.forEach(callback)
+                            links.forEach { link ->
+                                val customLink = newExtractorLink(
+                                    source = link.source,
+                                    name = link.name,
+                                    url = link.url
+                                ) {
+                                    this.referer = "$mainUrl/"
+                                    this.headers = headers
+                                    this.quality = link.quality
+                                    this.isM3u8 = true
+                                }
+                                callback.invoke(customLink)
+                            }
                         } else {
                             val link = newExtractorLink(
                                 source = name,

@@ -15,9 +15,9 @@ class HdfilmcehennemiProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "" to "Son Eklenen Filmler",
-        "diziler/" to "Son Eklenen Diziler",
-        "populer-filmler/" to "Populer Filmler",
-        "en-cok-begenilen-filmler/" to "En Cok Begenilenler"
+        "yabancidiziizle-5/" to "Son Eklenen Diziler",
+        "category/tavsiye-filmler-izle2/" to "Tavsiye Filmler",
+        "imdb-7-puan-uzeri-filmler-2/" to "IMDb 7+ Filmler"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -83,7 +83,7 @@ class HdfilmcehennemiProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val title = doc.selectFirst("h1, .movie-title, .title")?.text()?.trim()
+        val title = doc.selectFirst(".poster-title, h1, .movie-title, .title")?.text()?.trim()
             ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
             ?: "Film"
 
@@ -269,7 +269,19 @@ class HdfilmcehennemiProvider : MainAPI() {
                         )
 
                         if (m3u8Links.isNotEmpty()) {
-                            m3u8Links.forEach(callback)
+                            m3u8Links.forEach { link ->
+                                val customLink = newExtractorLink(
+                                    source = link.source,
+                                    name = link.name,
+                                    url = link.url
+                                ) {
+                                    this.referer = "https://hdfilmcehennemi.mobi/"
+                                    this.headers = playmixHeaders
+                                    this.quality = link.quality
+                                    this.isM3u8 = true
+                                }
+                                callback.invoke(customLink)
+                            }
                         } else {
                             val link = newExtractorLink(
                                 source = name,

@@ -16,15 +16,15 @@ class FilmMakinesiProvider : MainAPI() {
     override val mainPage = mainPageOf(
         "" to "Son Eklenen Filmler",
         "yabanci-dizi-izle-1/" to "Son Eklenen Diziler",
-        "en-cok-izlenen-filmler/" to "Cok Izlenen Filmler",
-        "film-arsivi/" to "Film Arsivi"
+        "film-izle/olmeden-izlenmesi-gerekenler-fm1/" to "Tavsiye Filmler",
+        "filmler-1/" to "Tum Filmler"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) {
             if (request.data.isEmpty()) mainUrl else "$mainUrl/${request.data}"
         } else {
-            if (request.data.isEmpty()) "$mainUrl/page/$page/" else "$mainUrl/${request.data}page/$page/"
+            if (request.data.isEmpty()) "$mainUrl/sayfa/$page/" else "$mainUrl/${request.data}sayfa/$page/"
         }
 
         val doc = app.get(url).document
@@ -43,14 +43,16 @@ class FilmMakinesiProvider : MainAPI() {
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val linkElem = this.selectFirst("a[href]") ?: return null
+        val linkElem = if (this.tagName() == "a") this else this.selectFirst("a[href*='/film/'], a[href*='/dizi/']") ?: this.selectFirst("a[href]") ?: return null
         val href = fixUrl(linkElem.attr("href"))
-        if (href == mainUrl || href.endsWith("/#") || href.contains("kategori/") || href.contains("tur/")) return null
+        if (href == mainUrl || href.endsWith("/#") || href.contains("kategori/") || href.contains("tur/") || href.contains("filmler-1")) return null
 
-        val title = this.selectFirst(".item-title, .title, h2, h3")?.text()?.trim()
+        val title = this.selectFirst(".item-title, .title:not(.film-title), h2, h3")?.text()?.trim()
             ?.ifEmpty { null }
             ?: linkElem.attr("title").trim().ifEmpty { null }
             ?: return null
+
+        if (title.equals("Sonuçlar", ignoreCase = true) || title.equals("Keşfet", ignoreCase = true)) return null
 
         val posterUrl = fixUrlNull(
             this.selectFirst("img")?.attr("data-src")
@@ -72,9 +74,8 @@ class FilmMakinesiProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val doc = app.get(searchUrl).document
-        return doc.select(".item, .content-article, div.thumbnail").mapNotNull {
+        val doc = app.post(mainUrl, data = mapOf("s" to query)).document
+        return doc.select(".item, .content-article, div.thumbnail, a[href*='/film/'], a[href*='/dizi/']").mapNotNull {
             it.toSearchResult()
         }.distinctBy { it.url }
     }
@@ -82,9 +83,10 @@ class FilmMakinesiProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val title = doc.selectFirst("h1, .movie-title, .title")?.text()?.trim()
+        val rawTitle = doc.selectFirst("h1.entry-title, h1[itemprop='name'], h1:not(.title), .movie-header h1")?.text()?.trim()
             ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
             ?: "Film"
+        val title = rawTitle.replace(Regex("""(?i)\s*(izle|film izle|full hd).*"""), "").trim()
 
         val posterUrl = fixUrlNull(
             doc.selectFirst("meta[property='og:image']")?.attr("content")
@@ -264,7 +266,19 @@ class FilmMakinesiProvider : MainAPI() {
                         )
 
                         if (m3u8Links.isNotEmpty()) {
-                            m3u8Links.forEach(callback)
+                            m3u8Links.forEach { link ->
+                                val customLink = newExtractorLink(
+                                    source = link.source,
+                                    name = link.name,
+                                    url = link.url
+                                ) {
+                                    this.referer = "https://closeload.filmmakinesi.to/"
+                                    this.headers = playerHeaders
+                                    this.quality = link.quality
+                                    this.isM3u8 = true
+                                }
+                                callback.invoke(customLink)
+                            }
                         } else {
                             val link = newExtractorLink(
                                 source = name,
