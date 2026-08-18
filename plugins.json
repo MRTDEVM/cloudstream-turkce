@@ -1,10 +1,10 @@
 [
     {
         "iconUrl": "https://filmmakinesi.to/favicon.ico",
-        "fileHash": "sha256-fe6c0e4d0bf9c878e06bd47cf771575b338975093bfe779ac3a6c688a4df1b42",
+        "fileHash": "sha256-0ae3298ebd9b0fef9d518270e44ec67af21859da241fa75d4520615cfaff8daf",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/MRTDEVM/cloudstream-turkce",
-        "fileSize": 15902,
+        "fileSize": 15903,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -14,7 +14,7 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "FilmMakinesi",
         "description": "FilmMakinesi Turkce Film ve Dizi Saglayicisi",
         "url": "https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/FilmMakinesi.cs3",
@@ -22,7 +22,7 @@
     },
     {
         "iconUrl": "https://www.fullhdfilmizlesene.now/favicon.ico",
-        "fileHash": "sha256-8a37dad9c0e625088ce95237c38064bebe15ab331e480d79fb3fcde2b839f82a",
+        "fileHash": "sha256-d7f7a6c1980db220aa9a247586d2163f7f6c99abd452b2479ff50b7f0614a459",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/MRTDEVM/cloudstream-turkce",
         "fileSize": 10911,
@@ -34,7 +34,7 @@
         "tvTypes": [
             "Movie"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "FullHDFilmizlesene",
         "description": "FullHDFilmizlesene Film Saglayicisi",
         "url": "https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/FullHDFilmizlesene.cs3",
@@ -42,7 +42,7 @@
     },
     {
         "iconUrl": "https://www.hdfilmcehennemi.nl/favicon.ico",
-        "fileHash": "sha256-2b45bfe1d31b8abab9fed0bcfccb14833b3b09a441f4d6f8a6a712e4b8d57752",
+        "fileHash": "sha256-1e7c66488e71dd31df295d41e6384530d28b8017f0ee365f6b48381159558807",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/MRTDEVM/cloudstream-turkce",
         "fileSize": 16199,
@@ -55,7 +55,7 @@
             "Movie",
             "TvSeries"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "Hdfilmcehennemi",
         "description": "HDFilmCehennemi Turkce Dublaj ve Altyazili Film / Dizi Saglayicisi",
         "url": "https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/Hdfilmcehennemi.cs3",
