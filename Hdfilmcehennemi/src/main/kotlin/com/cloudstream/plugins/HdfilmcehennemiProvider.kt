@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class HdfilmcehennemiProvider : MainAPI() {
-    override var mainUrl = "https://www.hdfimcehennemi.nl"
+    override var mainUrl = "https://www.hdfilmcehennemi.nl"
     override var name = "HDFilmCehennemi"
     override val hasMainPage = true
     override var lang = "tr"
