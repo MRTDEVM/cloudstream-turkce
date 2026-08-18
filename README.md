@@ -8,12 +8,19 @@ Bu depoda populer Turkce film ve dizi siteleri icin CloudStream 3 eklentileri bu
 
 ---
 
-## Kurulum ve CloudStream Uygulamasina Ekleme
+## 📱 CloudStream Uygulamasına Ekleme
 
-1. Bu projeyi GitHub hesabinizda olusturduguniz yeni bir depoya yukleyin (push).
-2. Repository ayarlarindan **Settings -> Actions -> General -> Workflow permissions -> Read and write permissions** secenegini isaretleyip kaydedin.
-3. GitHub Actions otomatik calisip projeyi derleyecek ve `builds` dalina `plugins.json` olusturacaktir.
-4. CloudStream uygulamasinda **Ayarlar -> Eklentiler -> Depo Ekle** kismina su linki girin:
-   ```text
-   https://raw.githubusercontent.com/<KULLANICI_ADINIZ>/<REPO_ADINIZ>/builds/plugins.json
-   ```
+### Seçenek 1: Kısa Kod ile (En Kolay)
+CloudStream uygulamasında **Ayarlar** ➔ **Eklentiler** ➔ **Depo Ekle** bölümüne şu kısa kodu girin:
+```text
+https://tinyurl.com/28xh5dkc
+```
+*(veya `https://da.gd/IA6Qo`)*
+
+---
+
+### Seçenek 2: Tam Bağlantı ile
+```text
+https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json
+```
+*(veya `.../plugins.json`)*
