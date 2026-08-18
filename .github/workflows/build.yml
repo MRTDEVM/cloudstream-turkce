@@ -34,7 +34,7 @@ jobs:
       - name: Build Plugins
         run: |
           chmod +x gradlew
-          ./gradlew make makePluginsJson --no-daemon --stacktrace
+          ./gradlew make makePluginsJson ensureJarCompatibility --no-daemon --stacktrace
 
       - name: Collect build artifacts
         run: |

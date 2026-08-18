@@ -1,5 +1,5 @@
 // Use an integer for version numbers
-version = 1
+version = 2
 
 cloudstream {
     description = "FilmMakinesi Turkce Film ve Dizi Saglayicisi"
@@ -15,4 +15,3 @@ android {
         minSdk = 21
     }
 }
-
