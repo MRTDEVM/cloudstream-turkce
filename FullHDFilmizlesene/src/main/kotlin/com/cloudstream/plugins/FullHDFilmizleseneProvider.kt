@@ -153,7 +153,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
                                     type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                                 ) {
                                     this.referer = "$mainUrl/"
-                                    this.headers.putAll(headers)
+                                    this.headers = headers
                                     this.quality = link.quality
                                 }
                                 callback.invoke(customLink)
@@ -166,7 +166,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
                                 type = ExtractorLinkType.M3U8
                             ) {
                                 this.referer = "$mainUrl/"
-                                this.headers.putAll(headers)
+                                this.headers = headers
                                 this.quality = Qualities.P1080.value
                             }
                             callback.invoke(link)

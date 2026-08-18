@@ -277,7 +277,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                                     type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                                 ) {
                                     this.referer = "https://hdfilmcehennemi.mobi/"
-                                    this.headers.putAll(playmixHeaders)
+                                    this.headers = playmixHeaders
                                     this.quality = link.quality
                                 }
                                 callback.invoke(customLink)
@@ -290,7 +290,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                                 type = ExtractorLinkType.M3U8
                             ) {
                                 this.referer = "https://hdfilmcehennemi.mobi/"
-                                this.headers.putAll(playmixHeaders)
+                                this.headers = playmixHeaders
                                 this.quality = Qualities.P1080.value
                             }
                             callback.invoke(link)

@@ -274,7 +274,7 @@ class FilmMakinesiProvider : MainAPI() {
                                     type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                                 ) {
                                     this.referer = "https://closeload.filmmakinesi.to/"
-                                    this.headers.putAll(playerHeaders)
+                                    this.headers = playerHeaders
                                     this.quality = link.quality
                                 }
                                 callback.invoke(customLink)
@@ -287,7 +287,7 @@ class FilmMakinesiProvider : MainAPI() {
                                 type = ExtractorLinkType.M3U8
                             ) {
                                 this.referer = "https://closeload.filmmakinesi.to/"
-                                this.headers.putAll(playerHeaders)
+                                this.headers = playerHeaders
                                 this.quality = Qualities.P1080.value
                             }
                             callback.invoke(link)
