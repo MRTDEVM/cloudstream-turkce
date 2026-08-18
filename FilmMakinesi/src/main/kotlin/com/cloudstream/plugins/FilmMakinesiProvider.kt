@@ -267,21 +267,29 @@ class FilmMakinesiProvider : MainAPI() {
 
                         if (m3u8Links.isNotEmpty()) {
                             m3u8Links.forEach { link ->
-                                val customLink = link.copy(
-                                    referer = "https://closeload.filmmakinesi.to/",
-                                    headers = playerHeaders
-                                )
+                                val customLink = newExtractorLink(
+                                    source = link.source,
+                                    name = link.name,
+                                    url = link.url,
+                                    type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                                ) {
+                                    this.referer = "https://closeload.filmmakinesi.to/"
+                                    this.headers.putAll(playerHeaders)
+                                    this.quality = link.quality
+                                }
                                 callback.invoke(customLink)
                             }
                         } else {
-                            val link = ExtractorLink(
+                            val link = newExtractorLink(
                                 source = name,
                                 name = name,
                                 url = videoUrl,
-                                referer = "https://closeload.filmmakinesi.to/",
-                                quality = Qualities.P1080.value,
-                                headers = playerHeaders
-                            )
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.referer = "https://closeload.filmmakinesi.to/"
+                                this.headers.putAll(playerHeaders)
+                                this.quality = Qualities.P1080.value
+                            }
                             callback.invoke(link)
                         }
                     }
