@@ -3,6 +3,7 @@ package com.cloudstream.plugins
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import android.util.Base64
 import java.nio.charset.StandardCharsets
 
 class FilmMakinesiProvider : MainAPI() {
@@ -169,7 +170,7 @@ class FilmMakinesiProvider : MainAPI() {
                 "atob" -> {
                     val pad = (4 - curr.length % 4) % 4
                     curr += "=".repeat(pad)
-                    curr = String(base64Decode(curr), StandardCharsets.ISO_8859_1)
+                    curr = String(Base64.decode(curr, Base64.DEFAULT), StandardCharsets.ISO_8859_1)
                 }
                 "reverse" -> {
                     curr = curr.reversed()
@@ -185,8 +186,9 @@ class FilmMakinesiProvider : MainAPI() {
                     }.joinToString("")
                 }
                 "xor" -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val (startAcc, step) = op.value as Pair<Int, Int>
+                    val pair = op.value as Pair<*, *>
+                    val startAcc = pair.first as Int
+                    val step = pair.second as Int
                     var acc = startAcc
                     val unmix = StringBuilder()
                     for (char in curr) {
