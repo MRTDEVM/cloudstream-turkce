@@ -165,8 +165,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
-                        val isM3u8 = videoUrl.contains(".m3u8") || videoUrl.contains(".txt")
-                        
+
                         val m3u8Links = M3u8Helper.generateM3u8(
                             source = name,
                             streamUrl = videoUrl,
@@ -176,16 +175,15 @@ class HdfilmcehennemiProvider : MainAPI() {
                         if (m3u8Links.isNotEmpty()) {
                             m3u8Links.forEach(callback)
                         } else {
-                            callback.invoke(
-                                ExtractorLink(
-                                    source = name,
-                                    name = name,
-                                    url = videoUrl,
-                                    referer = sourceUrl,
-                                    quality = Qualities.P1080.value,
-                                    isM3u8 = isM3u8
-                                )
-                            )
+                            val link = newExtractorLink(
+                                source = name,
+                                name = name,
+                                url = videoUrl
+                            ) {
+                                this.referer = sourceUrl
+                                this.quality = Qualities.P1080.value
+                            }
+                            callback.invoke(link)
                         }
                     }
 
