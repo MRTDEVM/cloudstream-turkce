@@ -3,6 +3,7 @@ package com.cloudstream.plugins
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import java.nio.charset.StandardCharsets
 
 class HdfilmcehennemiProvider : MainAPI() {
     override var mainUrl = "https://www.hdfilmcehennemi.nl"
@@ -131,6 +132,80 @@ class HdfilmcehennemiProvider : MainAPI() {
         }
     }
 
+    private fun decodeStreamUrl(embedHtml: String): String? {
+        val callMatch = Regex("""dc_[A-Za-z0-9_]+\s*\(\s*\[(.*?)\]\s*\)""").find(embedHtml) ?: return null
+        val rawArray = callMatch.groupValues[1]
+        val parts = rawArray.split(",").map { it.trim('"', '\'', ' ', ';') }
+
+        val funcMatch = Regex("""function\s+dc_[A-Za-z0-9_]+\s*\([^)]*\)\s*\{([\s\S]*?)(?:return\s+unmix;|return\s+result;)""").find(embedHtml) ?: return null
+        val body = funcMatch.groupValues[1]
+
+        var curr = parts.joinToString("")
+
+        data class Op(val index: Int, val type: String, val value: Any?)
+        val ops = mutableListOf<Op>()
+
+        Regex("""atob\(""").findAll(body).forEach { ops.add(Op(it.range.first, "atob", null)) }
+        Regex("""reverse\(""").findAll(body).forEach { ops.add(Op(it.range.first, "reverse", null)) }
+        Regex("""replace\(/\[a-zA-Z\]/g""").findAll(body).forEach { match ->
+            val sub = body.substring(match.range.first, (match.range.first + 200).coerceAtMost(body.length))
+            val shiftMatch = Regex("""o\s*-\s*base\s*\+\s*(\d+)""").find(sub)
+            val shift = shiftMatch?.groupValues?.get(1)?.toIntOrNull() ?: 6
+            ops.add(Op(match.range.first, "rot", shift))
+        }
+        Regex("""for\s*\(""").findAll(body).forEach { match ->
+            val accMatch = Regex("""var\s+acc\s*=\s*(\d+)""").find(body)
+            val stepMatch = Regex("""acc\s*=\s*\(\s*acc\s*\+\s*(\d+)\s*\)""").find(body)
+            if (accMatch != null && stepMatch != null) {
+                val acc = accMatch.groupValues[1].toInt()
+                val step = stepMatch.groupValues[1].toInt()
+                ops.add(Op(match.range.first, "xor", Pair(acc, step)))
+            }
+        }
+
+        ops.sortBy { it.index }
+
+        for (op in ops) {
+            when (op.type) {
+                "atob" -> {
+                    val pad = (4 - curr.length % 4) % 4
+                    curr += "=".repeat(pad)
+                    curr = String(base64Decode(curr), StandardCharsets.ISO_8859_1)
+                }
+                "reverse" -> {
+                    curr = curr.reversed()
+                }
+                "rot" -> {
+                    val shift = op.value as Int
+                    curr = curr.map { c ->
+                        when (c) {
+                            in 'a'..'z' -> ((c.code - 97 + shift) % 26 + 97).toChar()
+                            in 'A'..'Z' -> ((c.code - 65 + shift) % 26 + 65).toChar()
+                            else -> c
+                        }
+                    }.joinToString("")
+                }
+                "xor" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val (startAcc, step) = op.value as Pair<Int, Int>
+                    var acc = startAcc
+                    val unmix = StringBuilder()
+                    for (char in curr) {
+                        val byte = char.code and 0xFF
+                        acc = (acc + step) % 256
+                        val plain = byte xor acc
+                        acc = (acc + byte) % 256
+                        unmix.append(plain.toChar())
+                    }
+                    curr = unmix.toString()
+                    break
+                }
+            }
+        }
+
+        return if (curr.startsWith("http")) curr else null
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -142,12 +217,14 @@ class HdfilmcehennemiProvider : MainAPI() {
         val iframes = mutableListOf<String>()
         doc.select("iframe[src], iframe[data-src]").forEach {
             val src = it.attr("src").ifEmpty { it.attr("data-src") }
-            if (src.isNotEmpty()) iframes.add(fixUrl(src))
+            if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
+                iframes.add(fixUrl(src))
+            }
         }
 
         doc.select("button[data-source], a[data-source], .player-nav [data-url], [data-video]").forEach {
             val rawSource = it.attr("data-source").ifEmpty { it.attr("data-url") }.ifEmpty { it.attr("data-video") }
-            if (rawSource.isNotEmpty()) {
+            if (rawSource.isNotEmpty() && !rawSource.contains("youtube.com") && !rawSource.contains("youtu.be")) {
                 if (rawSource.startsWith("http")) {
                     iframes.add(rawSource)
                 } else if (rawSource.startsWith("//")) {
@@ -161,11 +238,23 @@ class HdfilmcehennemiProvider : MainAPI() {
                 if (sourceUrl.contains("hdfilmcehennemi") || sourceUrl.contains("rapid") || sourceUrl.contains("closeload") || sourceUrl.contains("playmix")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
 
-                    // Extract all stream links
+                    // Decode dynamic JS stream URL
+                    val decodedStream = decodeStreamUrl(embedDoc)
+                    val streamUrls = mutableListOf<String>()
+                    if (decodedStream != null) {
+                        streamUrls.add(decodedStream)
+                    }
+
+                    // Fallback plain regex
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
+                        if (!videoUrl.contains("player") && !videoUrl.contains("favicon")) {
+                            streamUrls.add(videoUrl)
+                        }
+                    }
 
+                    for (videoUrl in streamUrls.distinct()) {
                         val m3u8Links = M3u8Helper.generateM3u8(
                             source = name,
                             streamUrl = videoUrl,
