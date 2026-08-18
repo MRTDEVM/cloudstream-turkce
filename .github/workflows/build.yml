@@ -36,6 +36,12 @@ jobs:
           chmod +x gradlew
           ./gradlew make makePluginsJson --no-daemon --stacktrace
 
+      - name: Collect build artifacts
+        run: |
+          cp **/build/*.cs3 build/ || true
+          cp **/build/*.jar build/ || true
+          ls -la build/
+
       - name: Deploy to builds branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
