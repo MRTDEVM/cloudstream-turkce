@@ -144,8 +144,8 @@ class FilmMakinesiProvider : MainAPI() {
             if (src.isNotEmpty()) iframes.add(fixUrl(src))
         }
 
-        doc.select(".player-section [data-src], .player-section [data-url]").forEach {
-            val src = it.attr("data-src").ifEmpty { it.attr("data-url") }
+        doc.select(".player-section [data-src], .player-section [data-url], [data-video]").forEach {
+            val src = it.attr("data-src").ifEmpty { it.attr("data-url") }.ifEmpty { it.attr("data-video") }
             if (src.isNotEmpty()) iframes.add(fixUrl(src))
         }
 
@@ -154,21 +154,32 @@ class FilmMakinesiProvider : MainAPI() {
                 if (sourceUrl.contains("closeload") || sourceUrl.contains("filmmakinesi") || sourceUrl.contains("playmix") || sourceUrl.contains("rapid")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
 
-                    // Direct HLS / Video links
+                    // Extract all stream links
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
                         val isM3u8 = videoUrl.contains(".m3u8") || videoUrl.contains(".txt")
-                        callback.invoke(
-                            ExtractorLink(
-                                source = name,
-                                name = name,
-                                url = videoUrl,
-                                referer = sourceUrl,
-                                quality = Qualities.P1080.value,
-                                isM3u8 = isM3u8
-                            )
+
+                        val m3u8Links = M3u8Helper.generateM3u8(
+                            source = name,
+                            streamUrl = videoUrl,
+                            referer = sourceUrl
                         )
+
+                        if (m3u8Links.isNotEmpty()) {
+                            m3u8Links.forEach(callback)
+                        } else {
+                            callback.invoke(
+                                ExtractorLink(
+                                    source = name,
+                                    name = name,
+                                    url = videoUrl,
+                                    referer = sourceUrl,
+                                    quality = Qualities.P1080.value,
+                                    isM3u8 = isM3u8
+                                )
+                            )
+                        }
                     }
 
                     // VTT Subtitles

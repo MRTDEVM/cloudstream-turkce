@@ -145,8 +145,8 @@ class HdfilmcehennemiProvider : MainAPI() {
             if (src.isNotEmpty()) iframes.add(fixUrl(src))
         }
 
-        doc.select("button[data-source], a[data-source], .player-nav [data-url]").forEach {
-            val rawSource = it.attr("data-source").ifEmpty { it.attr("data-url") }
+        doc.select("button[data-source], a[data-source], .player-nav [data-url], [data-video]").forEach {
+            val rawSource = it.attr("data-source").ifEmpty { it.attr("data-url") }.ifEmpty { it.attr("data-video") }
             if (rawSource.isNotEmpty()) {
                 if (rawSource.startsWith("http")) {
                     iframes.add(rawSource)
@@ -160,22 +160,33 @@ class HdfilmcehennemiProvider : MainAPI() {
             try {
                 if (sourceUrl.contains("hdfilmcehennemi") || sourceUrl.contains("rapid") || sourceUrl.contains("closeload") || sourceUrl.contains("playmix")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
-                    
-                    // Direct HLS / Video links
+
+                    // Extract all stream links
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
                         val isM3u8 = videoUrl.contains(".m3u8") || videoUrl.contains(".txt")
-                        callback.invoke(
-                            ExtractorLink(
-                                source = name,
-                                name = name,
-                                url = videoUrl,
-                                referer = sourceUrl,
-                                quality = Qualities.P1080.value,
-                                isM3u8 = isM3u8
-                            )
+                        
+                        val m3u8Links = M3u8Helper.generateM3u8(
+                            source = name,
+                            streamUrl = videoUrl,
+                            referer = sourceUrl
                         )
+
+                        if (m3u8Links.isNotEmpty()) {
+                            m3u8Links.forEach(callback)
+                        } else {
+                            callback.invoke(
+                                ExtractorLink(
+                                    source = name,
+                                    name = name,
+                                    url = videoUrl,
+                                    referer = sourceUrl,
+                                    quality = Qualities.P1080.value,
+                                    isM3u8 = isM3u8
+                                )
+                            )
+                        }
                     }
 
                     // VTT Subtitles
@@ -194,7 +205,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                     loadExtractor(sourceUrl, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
-                // Ignore failure for individual embed
+                // Ignore individual embed error
             }
         }
 
