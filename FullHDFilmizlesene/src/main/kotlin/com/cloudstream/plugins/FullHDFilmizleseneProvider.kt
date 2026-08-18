@@ -138,38 +138,38 @@ class FullHDFilmizleseneProvider : MainAPI() {
                     )
 
                     for (videoUrl in m3u8s) {
+                        // 1. Emit Master M3U8 URL directly (Ensures ExoPlayer loads audio track + video)
+                        val masterLink = newExtractorLink(
+                            source = name,
+                            name = "$name (Sesli Oynatıcı)",
+                            url = videoUrl,
+                            type = ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = "$mainUrl/"
+                            this.headers = headers
+                            this.quality = Qualities.P1080.value
+                        }
+                        callback.invoke(masterLink)
+
+                        // 2. Also emit resolution sub-links as fallbacks
                         val links = M3u8Helper.generateM3u8(
                             source = name,
                             streamUrl = videoUrl,
                             referer = "$mainUrl/",
                             headers = headers
                         )
-                        if (links.isNotEmpty()) {
-                            links.forEach { link ->
-                                val customLink = newExtractorLink(
-                                    source = link.source,
-                                    name = link.name,
-                                    url = link.url,
-                                    type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                                ) {
-                                    this.referer = "$mainUrl/"
-                                    this.headers = headers
-                                    this.quality = link.quality
-                                }
-                                callback.invoke(customLink)
-                            }
-                        } else {
-                            val link = newExtractorLink(
-                                source = name,
-                                name = name,
-                                url = videoUrl,
-                                type = ExtractorLinkType.M3U8
+                        links.forEach { link ->
+                            val customLink = newExtractorLink(
+                                source = link.source,
+                                name = link.name,
+                                url = link.url,
+                                type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                             ) {
                                 this.referer = "$mainUrl/"
                                 this.headers = headers
-                                this.quality = Qualities.P1080.value
+                                this.quality = link.quality
                             }
-                            callback.invoke(link)
+                            callback.invoke(customLink)
                         }
                     }
                 } else {

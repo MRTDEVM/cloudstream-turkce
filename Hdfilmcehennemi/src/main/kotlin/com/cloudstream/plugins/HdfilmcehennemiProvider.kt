@@ -261,39 +261,38 @@ class HdfilmcehennemiProvider : MainAPI() {
                             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                         )
 
+                        // 1. Emit Master M3U8 URL directly (Ensures ExoPlayer loads audio track + video)
+                        val masterLink = newExtractorLink(
+                            source = name,
+                            name = "$name (Sesli Oynatıcı)",
+                            url = videoUrl,
+                            type = ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = "https://hdfilmcehennemi.mobi/"
+                            this.headers = playmixHeaders
+                            this.quality = Qualities.P1080.value
+                        }
+                        callback.invoke(masterLink)
+
+                        // 2. Also emit resolution sub-links as fallbacks
                         val m3u8Links = M3u8Helper.generateM3u8(
                             source = name,
                             streamUrl = videoUrl,
                             referer = "https://hdfilmcehennemi.mobi/",
                             headers = playmixHeaders
                         )
-
-                        if (m3u8Links.isNotEmpty()) {
-                            m3u8Links.forEach { link ->
-                                val customLink = newExtractorLink(
-                                    source = link.source,
-                                    name = link.name,
-                                    url = link.url,
-                                    type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                                ) {
-                                    this.referer = "https://hdfilmcehennemi.mobi/"
-                                    this.headers = playmixHeaders
-                                    this.quality = link.quality
-                                }
-                                callback.invoke(customLink)
-                            }
-                        } else {
-                            val link = newExtractorLink(
-                                source = name,
-                                name = name,
-                                url = videoUrl,
-                                type = ExtractorLinkType.M3U8
+                        m3u8Links.forEach { link ->
+                            val customLink = newExtractorLink(
+                                source = link.source,
+                                name = link.name,
+                                url = link.url,
+                                type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                             ) {
                                 this.referer = "https://hdfilmcehennemi.mobi/"
                                 this.headers = playmixHeaders
-                                this.quality = Qualities.P1080.value
+                                this.quality = link.quality
                             }
-                            callback.invoke(link)
+                            callback.invoke(customLink)
                         }
                     }
 
