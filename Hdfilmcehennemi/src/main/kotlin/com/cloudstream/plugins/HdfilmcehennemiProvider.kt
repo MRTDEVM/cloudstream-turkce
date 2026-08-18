@@ -91,7 +91,8 @@ class HdfilmcehennemiProvider : MainAPI() {
             doc.selectFirst("meta[property='og:image']")?.attr("content")
                 ?: doc.selectFirst(".poster-media img, .movie-poster img, .poster img")?.attr("src")
         )
-        val description = doc.selectFirst(".movie-story, .story, .overview, p.description, .entry-content")?.text()?.trim()
+        val description = doc.selectFirst(".movie-story, .story, .overview, p.description, .entry-content, .film-ozeti, .ozet, meta[name='description']")?.text()?.trim()
+            ?: doc.selectFirst("meta[property='og:description']")?.attr("content")?.trim()
         val year = doc.selectFirst("a[href*='/yil/'], span.year, .release-date")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }
@@ -240,14 +241,12 @@ class HdfilmcehennemiProvider : MainAPI() {
                 if (sourceUrl.contains("hdfilmcehennemi") || sourceUrl.contains("rapid") || sourceUrl.contains("closeload") || sourceUrl.contains("playmix")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
 
-                    // Decode dynamic JS stream URL
-                    val decodedStream = decodeStreamUrl(embedDoc)
                     val streamUrls = mutableListOf<String>()
+                    val decodedStream = decodeStreamUrl(embedDoc)
                     if (decodedStream != null) {
                         streamUrls.add(decodedStream)
                     }
 
-                    // Fallback plain regex
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
@@ -257,10 +256,16 @@ class HdfilmcehennemiProvider : MainAPI() {
                     }
 
                     for (videoUrl in streamUrls.distinct()) {
+                        val playmixHeaders = mapOf(
+                            "Referer" to "https://hdfilmcehennemi.mobi/",
+                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        )
+
                         val m3u8Links = M3u8Helper.generateM3u8(
                             source = name,
                             streamUrl = videoUrl,
-                            referer = sourceUrl
+                            referer = "https://hdfilmcehennemi.mobi/",
+                            headers = playmixHeaders
                         )
 
                         if (m3u8Links.isNotEmpty()) {
@@ -271,7 +276,8 @@ class HdfilmcehennemiProvider : MainAPI() {
                                 name = name,
                                 url = videoUrl
                             ) {
-                                this.referer = sourceUrl
+                                this.referer = "https://hdfilmcehennemi.mobi/"
+                                this.headers = playmixHeaders
                                 this.quality = Qualities.P1080.value
                             }
                             callback.invoke(link)

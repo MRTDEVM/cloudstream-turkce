@@ -1,5 +1,5 @@
 // Use an integer for version numbers
-version = 3
+version = 4
 
 cloudstream {
     description = "HDFilmCehennemi Turkce Dublaj ve Altyazili Film / Dizi Saglayicisi"

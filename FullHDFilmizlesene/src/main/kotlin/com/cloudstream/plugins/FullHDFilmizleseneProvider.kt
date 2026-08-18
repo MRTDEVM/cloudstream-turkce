@@ -80,7 +80,8 @@ class FullHDFilmizleseneProvider : MainAPI() {
                 ?: doc.selectFirst(".film-afis img, .poster img, .movie-poster img")?.attr("data-src")
                 ?: doc.selectFirst(".film-afis img, .poster img, .movie-poster img")?.attr("src")
         )
-        val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story, .film-story")?.text()?.trim()
+        val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story, .film-story, meta[name='description']")?.text()?.trim()
+            ?: doc.selectFirst("meta[property='og:description']")?.attr("content")?.trim()
         val year = doc.selectFirst("a[href*='/yapim-yili/'], .film-bilgisi li")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/kategori/'], a[href*='/tur/']").map { it.text().trim() }
@@ -105,11 +106,64 @@ class FullHDFilmizleseneProvider : MainAPI() {
         val iframes = mutableListOf<String>()
         doc.select("iframe[src], iframe[data-src]").forEach {
             val src = it.attr("src").ifEmpty { it.attr("data-src") }
-            if (src.isNotEmpty()) iframes.add(fixUrl(src))
+            if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
+                iframes.add(fixUrl(src))
+            }
+        }
+
+        // Extract scx code or embedded player
+        val scxMatch = Regex("""var\s+scx\s*=\s*(\{.*?\});""").find(doc.html())
+        if (scxMatch != null) {
+            val jsonStr = scxMatch.groupValues[1]
+            Regex(""""t"\s*:\s*\[\s*"([^"]+)"\s*\]""").findAll(jsonStr).forEach { match ->
+                val code = match.groupValues[1]
+                if (!code.contains("youtube")) {
+                    val embedUrl = if (code.startsWith("http")) code else "$mainUrl/$code"
+                    iframes.add(embedUrl)
+                }
+            }
         }
 
         for (sourceUrl in iframes.distinct()) {
-            loadExtractor(sourceUrl, subtitleCallback, callback)
+            try {
+                if (sourceUrl.contains("fullhdfilmizlesene") || sourceUrl.contains("atom") || sourceUrl.contains("playmix") || sourceUrl.contains("closeload")) {
+                    val embedDoc = app.get(sourceUrl, referer = data).text
+                    val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
+                    val m3u8s = m3u8Regex.findAll(embedDoc).map { it.value.replace("\\/", "/") }.distinct().toList()
+
+                    val headers = mapOf(
+                        "Referer" to "$mainUrl/",
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    )
+
+                    for (videoUrl in m3u8s) {
+                        val links = M3u8Helper.generateM3u8(
+                            source = name,
+                            streamUrl = videoUrl,
+                            referer = "$mainUrl/",
+                            headers = headers
+                        )
+                        if (links.isNotEmpty()) {
+                            links.forEach(callback)
+                        } else {
+                            val link = newExtractorLink(
+                                source = name,
+                                name = name,
+                                url = videoUrl
+                            ) {
+                                this.referer = "$mainUrl/"
+                                this.headers = headers
+                                this.quality = Qualities.P1080.value
+                            }
+                            callback.invoke(link)
+                        }
+                    }
+                } else {
+                    loadExtractor(sourceUrl, subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                // Ignore individual embed error
+            }
         }
 
         return true

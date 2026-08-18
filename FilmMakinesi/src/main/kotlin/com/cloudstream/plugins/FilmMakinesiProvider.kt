@@ -90,7 +90,8 @@ class FilmMakinesiProvider : MainAPI() {
             doc.selectFirst("meta[property='og:image']")?.attr("content")
                 ?: doc.selectFirst(".movie-poster img, .poster img, .entry-content img")?.attr("src")
         )
-        val description = doc.selectFirst(".entry-content p, .overview, .film-story")?.text()?.trim()
+        val description = doc.selectFirst(".entry-content p, .overview, .film-story, .movie-story, .story, meta[name='description']")?.text()?.trim()
+            ?: doc.selectFirst("meta[property='og:description']")?.attr("content")?.trim()
         val year = doc.selectFirst("a[href*='/release-year/'], a[href*='/yil/']")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
         val tags = doc.select("a[href*='/genre/'], a[href*='/kategori/']").map { it.text().trim() }
@@ -235,14 +236,12 @@ class FilmMakinesiProvider : MainAPI() {
                 if (sourceUrl.contains("closeload") || sourceUrl.contains("filmmakinesi") || sourceUrl.contains("playmix") || sourceUrl.contains("rapid")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
 
-                    // Decode dynamic JS stream URL
-                    val decodedStream = decodeStreamUrl(embedDoc)
                     val streamUrls = mutableListOf<String>()
+                    val decodedStream = decodeStreamUrl(embedDoc)
                     if (decodedStream != null) {
                         streamUrls.add(decodedStream)
                     }
 
-                    // Fallback plain regex
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
@@ -252,10 +251,16 @@ class FilmMakinesiProvider : MainAPI() {
                     }
 
                     for (videoUrl in streamUrls.distinct()) {
+                        val playerHeaders = mapOf(
+                            "Referer" to "https://closeload.filmmakinesi.to/",
+                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        )
+
                         val m3u8Links = M3u8Helper.generateM3u8(
                             source = name,
                             streamUrl = videoUrl,
-                            referer = sourceUrl
+                            referer = "https://closeload.filmmakinesi.to/",
+                            headers = playerHeaders
                         )
 
                         if (m3u8Links.isNotEmpty()) {
@@ -266,7 +271,8 @@ class FilmMakinesiProvider : MainAPI() {
                                 name = name,
                                 url = videoUrl
                             ) {
-                                this.referer = sourceUrl
+                                this.referer = "https://closeload.filmmakinesi.to/"
+                                this.headers = playerHeaders
                                 this.quality = Qualities.P1080.value
                             }
                             callback.invoke(link)
