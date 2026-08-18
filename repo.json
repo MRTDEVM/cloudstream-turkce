@@ -1,0 +1,8 @@
+{
+  "name": "CloudStream Türkçe",
+  "description": "Türkçe Film ve Dizi Eklentileri Deposu",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/plugins.json"
+  ]
+}
