@@ -27,7 +27,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
 
         val doc = app.get(url).document
         val home = doc.select("li.film, .film-kutu, .movie-item, article.film").mapNotNull {
-            it.toSearchResponse()
+            it.toSearchResult()
         }
 
         return newHomePageResponse(
@@ -54,12 +54,13 @@ class FullHDFilmizleseneProvider : MainAPI() {
             this.posterUrl = posterUrl
         }
     }
+
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=$query"
         val doc = app.get(searchUrl).document
 
         return doc.select("li.film, .film-kutu, .movie-item, article").mapNotNull {
-            it.toSearchResponse()
+            it.toSearchResult()
         }
     }
 
@@ -72,7 +73,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
         )
         val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yapim-yili/'], .film-bilgisi li")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val rating = doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.toRatingInt()
+        val rating = doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(10)?.toInt()
         val tags = doc.select("a[href*='/kategori/'], a[href*='/tur/']").map { it.text().trim() }
 
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
@@ -94,12 +95,12 @@ class FullHDFilmizleseneProvider : MainAPI() {
         val iframes = mutableListOf<String>()
 
         doc.select("iframe[src], iframe[data-src]").forEach {
-            val src = it.attr("src").impty { it.attr("data-src") }
+            val src = it.attr("src").ifEmpty { it.attr("data-src") }
             if (src.isNotEmpty()) iframes.add(fixUrl(src))
         }
 
         doc.select("[data-source], [data-frame], .kaynaklar a").forEach {
-            val raw = it.attr("data-source").impty { it.attr("data-frame") }
+            val raw = it.attr("data-source").ifEmpty { it.attr("data-frame") }
             if (raw.isNotEmpty()) {
                 if (raw.startsWith("http")) iframes.add(raw)
                 else if (raw.startsWith("//")) iframes.add("https:$raw")

@@ -42,7 +42,7 @@ subprojects {
     }
 
     android {
-        namespace = "com.example"
+        namespace = "com.cloudstream." + project.name.lowercase()
 
         defaultConfig {
             minSdk = 21

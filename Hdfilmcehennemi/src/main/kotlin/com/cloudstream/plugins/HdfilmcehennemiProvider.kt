@@ -26,7 +26,7 @@ class HdfilmcehennemiProvider : MainAPI() {
         }
 
         val doc = app.get(url).document
-        val home = doc.select("div.poster, dbv.poster-media, dbv.card-body, a.poster").mapNotNull {
+        val home = doc.select("div.poster, div.poster-media, div.card-body, a.poster").mapNotNull {
             it.toSearchResult()
         }
 
@@ -50,10 +50,10 @@ class HdfilmcehennemiProvider : MainAPI() {
                 ?: this.selectFirst("img")?.attr("src")
         )
 
-        val isVvSeries = href.contains("/dizi/") || this.selectFirst(".badge-dizi, .is-series") != null
+        val isTvSeries = href.contains("/dizi/") || this.selectFirst(".badge-dizi, .is-series") != null
 
         return if (isTvSeries) {
-            newTuSeriesSearchResponse(title, href, TvType.TvSeries) {
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
             }
         } else {
@@ -67,8 +67,8 @@ class HdfilmcehennemiProvider : MainAPI() {
         val searchUrl = "$mainUrl/search/index.php?s=$query"
         val doc = app.get(searchUrl).document
 
-        return doc.select("div.poster, dbv.poster-media, dbv.search-result, .card").mapNotNull {
-            it.toSearchResponse()
+        return doc.select("div.poster, div.poster-media, div.search-result, .card").mapNotNull {
+            it.toSearchResult()
         }
     }
 
@@ -81,12 +81,12 @@ class HdfilmcehennemiProvider : MainAPI() {
         )
         val description = doc.selectFirst(".movie-story, .story, .overview, p.description")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yil/'], span.year, .release-date")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val rating = doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.toRatingInt()
+        val rating = doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(10)?.toInt()
         val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }
 
-        val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .pepisode-list").isNotEmpty()
+        val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .episode-list").isNotEmpty()
 
-        return if (isVvSeries) {
+        return if (isTvSeries) {
             val episodes = mutableListOf<Episode>()
             doc.select(".season-wrapper, .season").forEachIndexed { seasonIdx, seasonElem ->
                 val seasonNum = seasonIdx + 1
@@ -103,7 +103,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                 }
             }
 
-            newVvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = description
                 this.year = year
@@ -120,6 +120,7 @@ class HdfilmcehennemiProvider : MainAPI() {
             }
         }
     }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -135,7 +136,7 @@ class HdfilmcehennemiProvider : MainAPI() {
         }
 
         doc.select("button[data-source], a[data-source], .player-nav [data-url]").forEach {
-            val rawSource = it.attr("data-source").impty { it.attr("data-url") }
+            val rawSource = it.attr("data-source").ifEmpty { it.attr("data-url") }
             if (rawSource.isNotEmpty()) {
                 if (rawSource.startsWith("http")) {
                     iframes.add(rawSource)
