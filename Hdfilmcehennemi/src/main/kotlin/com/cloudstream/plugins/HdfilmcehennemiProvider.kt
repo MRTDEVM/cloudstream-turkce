@@ -81,7 +81,7 @@ class HdfilmcehennemiProvider : MainAPI() {
         )
         val description = doc.selectFirst(".movie-story, .story, .overview, p.description")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yil/'], span.year, .release-date")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val rating = doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(10)?.toInt()
+        val score = doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(1000)?.toInt()
         val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }
 
         val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .episode-list").isNotEmpty()
@@ -108,7 +108,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                 this.plot = description
                 this.year = year
                 this.tags = tags
-                this.rating = rating
+                this.score = score
             }
         } else {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
@@ -116,7 +116,7 @@ class HdfilmcehennemiProvider : MainAPI() {
                 this.plot = description
                 this.year = year
                 this.tags = tags
-                this.rating = rating
+                this.score = score
             }
         }
     }

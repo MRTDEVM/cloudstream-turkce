@@ -73,7 +73,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
         )
         val description = doc.selectFirst(".film-ozeti, .ozet, .description, .story")?.text()?.trim()
         val year = doc.selectFirst("a[href*='/yapim-yili/'], .film-bilgisi li")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val rating = doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(10)?.toInt()
+        val score = doc.selectFirst(".imdb-puani, .imdb, .rating")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull()?.times(1000)?.toInt()
         val tags = doc.select("a[href*='/kategori/'], a[href*='/tur/']").map { it.text().trim() }
 
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
@@ -81,7 +81,7 @@ class FullHDFilmizleseneProvider : MainAPI() {
             this.plot = description
             this.year = year
             this.tags = tags
-            this.rating = rating
+            this.score = score
         }
     }
 
