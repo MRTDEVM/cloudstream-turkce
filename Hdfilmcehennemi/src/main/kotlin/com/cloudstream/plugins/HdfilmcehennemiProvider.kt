@@ -270,28 +270,21 @@ class HdfilmcehennemiProvider : MainAPI() {
 
                         if (m3u8Links.isNotEmpty()) {
                             m3u8Links.forEach { link ->
-                                val customLink = newExtractorLink(
-                                    source = link.source,
-                                    name = link.name,
-                                    url = link.url
-                                ) {
-                                    this.referer = "https://hdfilmcehennemi.mobi/"
-                                    this.headers = playmixHeaders
-                                    this.quality = link.quality
-                                    this.isM3u8 = true
-                                }
+                                val customLink = link.copy(
+                                    referer = "https://hdfilmcehennemi.mobi/",
+                                    headers = playmixHeaders
+                                )
                                 callback.invoke(customLink)
                             }
                         } else {
-                            val link = newExtractorLink(
+                            val link = ExtractorLink(
                                 source = name,
                                 name = name,
-                                url = videoUrl
-                            ) {
-                                this.referer = "https://hdfilmcehennemi.mobi/"
-                                this.headers = playmixHeaders
-                                this.quality = Qualities.P1080.value
-                            }
+                                url = videoUrl,
+                                referer = "https://hdfilmcehennemi.mobi/",
+                                quality = Qualities.P1080.value,
+                                headers = playmixHeaders
+                            )
                             callback.invoke(link)
                         }
                     }

@@ -146,28 +146,21 @@ class FullHDFilmizleseneProvider : MainAPI() {
                         )
                         if (links.isNotEmpty()) {
                             links.forEach { link ->
-                                val customLink = newExtractorLink(
-                                    source = link.source,
-                                    name = link.name,
-                                    url = link.url
-                                ) {
-                                    this.referer = "$mainUrl/"
-                                    this.headers = headers
-                                    this.quality = link.quality
-                                    this.isM3u8 = true
-                                }
+                                val customLink = link.copy(
+                                    referer = "$mainUrl/",
+                                    headers = headers
+                                )
                                 callback.invoke(customLink)
                             }
                         } else {
-                            val link = newExtractorLink(
+                            val link = ExtractorLink(
                                 source = name,
                                 name = name,
-                                url = videoUrl
-                            ) {
-                                this.referer = "$mainUrl/"
-                                this.headers = headers
-                                this.quality = Qualities.P1080.value
-                            }
+                                url = videoUrl,
+                                referer = "$mainUrl/",
+                                quality = Qualities.P1080.value,
+                                headers = headers
+                            )
                             callback.invoke(link)
                         }
                     }
