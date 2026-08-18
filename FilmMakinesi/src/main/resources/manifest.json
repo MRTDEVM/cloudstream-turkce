@@ -1,0 +1,10 @@
+{
+  "name": "FilmMakinesi",
+  "pluginId": "com.cloudstream.plugins.FilmMakinesi",
+  "version": 1,
+  "author": "CloudStream User",
+  "description": "FilmMakinesi Turkce Film ve Dizi Saglayicisi",
+  "language": "tr",
+  "tvTypes": ["Movie", "TvSeries"],
+  "iconUrl": "https://filmmakinesi.to/favicon.ico"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "HDFilmCehennemi",
+  "pluginId": "com.cloudstream.plugins.Hdfilmcehennemi",
+  "version": 1,
+  "author": "CloudStream User",
+  "description": "HDFilmCehennemi Turkce Dublaj ve Altyazili Film / Dizi Saglayicisi",
+  "language": "tr",
+  "tvTypes": ["Movie", "TvSeries"],
+  "iconUrl": "https://www.hdfimcehennemi.nl/favicon.ico"
+}

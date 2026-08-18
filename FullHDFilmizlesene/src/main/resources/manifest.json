@@ -1,0 +1,10 @@
+{
+  "name": "FullHDFilmizlesene",
+  "pluginId": "com.cloudstream.plugins.FullHDFilmizlesene",
+  "version": 1,
+  "author": "CloudStream User",
+  "description": "FullHDFilmizlesene Film Saglayicisi",
+  "language": "tr",
+  "tvTypes": ["Movie"],
+  "iconUrl": "https://www.fullhdfimizlesene.now/favicon.ico"
+}
