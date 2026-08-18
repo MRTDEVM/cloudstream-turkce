@@ -20,15 +20,11 @@ Android TV veya el ile kurulum için:
 
 1. **CloudStream 3** uygulamasını açın.
 2. **Ayarlar (Settings)** ➔ **Eklentiler (Extensions)** ➔ **Depo Ekle (Add Repository)** kısmına gidin.
-3. Aşağıdaki bağlantılardan birini **Depo URL / Kısa Kod** kutucuğuna yapıştırın:
+3. Aşağıdaki bağlantıyı **Depo URL** kutucuğuna yapıştırın:
 
-### 🔗 Depo Bağlantıları
-
-| Tür | Bağlantı / Kod |
-| :--- | :--- |
-| **Kısa Kod (Önerilen)** | `https://tinyurl.com/28xh5dkc` |
-| **Alternatif Kısa Kod** | `https://da.gd/IA6Qo` |
-| **Doğrudan JSON URL** | `https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json` |
+```
+https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/plugins.json
+```
 
 ---
 
