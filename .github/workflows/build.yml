@@ -26,12 +26,13 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
 
       - name: Build with Gradle
         run: |
-          chmod +x gradlew || true
-          ./gradlew make --no-daemon --stacktrace
+          gradle make --no-daemon --stacktrace
 
       - name: Deploy to builds branch
         uses: JamesIves/github-pages-deploy-action@v4
