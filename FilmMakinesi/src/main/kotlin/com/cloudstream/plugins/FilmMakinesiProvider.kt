@@ -28,7 +28,7 @@ class FilmMakinesiProvider : MainAPI() {
         }
 
         val doc = app.get(url).document
-        val home = doc.select(".item, .content-article, div.thumbnail").mapNotNull {
+        val home = doc.select(".slide, .item, a.slide").mapNotNull {
             it.toSearchResult()
         }.distinctBy { it.url }
 
@@ -45,11 +45,12 @@ class FilmMakinesiProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val linkElem = if (this.tagName() == "a") this else this.selectFirst("a[href*='/film/'], a[href*='/dizi/']") ?: this.selectFirst("a[href]") ?: return null
         val href = fixUrl(linkElem.attr("href"))
-        if (href == mainUrl || href.endsWith("/#") || href.contains("kategori/") || href.contains("tur/") || href.contains("filmler-1")) return null
+        if (href == mainUrl || href.endsWith("/#") || href.contains("/tur/") || href.contains("filmler-1") || href.contains("/sayfa/")) return null
 
-        val title = this.selectFirst(".item-title, .title:not(.film-title), h2, h3")?.text()?.trim()
+        val title = this.selectFirst(".item-title a, .item-title, .title:not(.title--area *)")?.text()?.trim()
             ?.ifEmpty { null }
             ?: linkElem.attr("title").trim().ifEmpty { null }
+            ?: linkElem.attr("alt").trim().ifEmpty { null }
             ?: return null
 
         if (title.equals("Sonuçlar", ignoreCase = true) || title.equals("Keşfet", ignoreCase = true)) return null
@@ -60,7 +61,7 @@ class FilmMakinesiProvider : MainAPI() {
                 ?: this.selectFirst("img")?.attr("src")
         )
 
-        val isTvSeries = href.contains("/dizi/") || this.selectFirst(".item-season, .item-ep") != null
+        val isTvSeries = href.contains("/dizi/")
 
         return if (isTvSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
@@ -75,7 +76,7 @@ class FilmMakinesiProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val doc = app.post(mainUrl, data = mapOf("s" to query)).document
-        return doc.select(".item, .content-article, div.thumbnail, a[href*='/film/'], a[href*='/dizi/']").mapNotNull {
+        return doc.select(".item, a[href*='/film/'], a[href*='/dizi/']").mapNotNull {
             it.toSearchResult()
         }.distinctBy { it.url }
     }
@@ -83,10 +84,11 @@ class FilmMakinesiProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val rawTitle = doc.selectFirst("h1.entry-title, h1[itemprop='name'], h1:not(.title), .movie-header h1")?.text()?.trim()
+        val rawTitle = doc.selectFirst("h1")?.text()?.trim()
             ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
             ?: "Film"
-        val title = rawTitle.replace(Regex("""(?i)\s*(izle|film izle|full hd).*"""), "").trim()
+        val title = rawTitle.replace(Regex("""(?i)\s*(izle|film izle|full hd).*"""), "")
+            .replace(Regex("""\s*\(\d{4}\)\s*$"""), "").trim()
 
         val posterUrl = fixUrlNull(
             doc.selectFirst("meta[property='og:image']")?.attr("content")
@@ -94,9 +96,9 @@ class FilmMakinesiProvider : MainAPI() {
         )
         val description = doc.selectFirst(".entry-content p, .overview, .film-story, .movie-story, .story, meta[name='description']")?.text()?.trim()
             ?: doc.selectFirst("meta[property='og:description']")?.attr("content")?.trim()
-        val year = doc.selectFirst("a[href*='/release-year/'], a[href*='/yil/']")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+        val year = doc.selectFirst("a[href*='/yil/']")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
-        val tags = doc.select("a[href*='/genre/'], a[href*='/kategori/']").map { it.text().trim() }
+        val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }.filter { it.isNotEmpty() }
 
         val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .episodes").isNotEmpty()
 
@@ -135,6 +137,11 @@ class FilmMakinesiProvider : MainAPI() {
         }
     }
 
+    /**
+     * Generic decoder for closeload dc_ functions.
+     * Dynamically detects operations (reverse, atob, rot, xor) from the JS function body
+     * and applies them in order to decode the stream URL.
+     */
     private fun decodeStreamUrl(embedHtml: String): String? {
         val callMatch = Regex("""dc_[A-Za-z0-9_]+\s*\(\s*\[(.*?)\]\s*\)""").find(embedHtml) ?: return null
         val rawArray = callMatch.groupValues[1]
@@ -219,6 +226,8 @@ class FilmMakinesiProvider : MainAPI() {
         val doc = app.get(data).document
 
         val iframes = mutableListOf<String>()
+
+        // 1. Get iframes (lazy-loaded with data-src)
         doc.select("iframe[src], iframe[data-src]").forEach {
             val src = it.attr("src").ifEmpty { it.attr("data-src") }
             if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
@@ -226,6 +235,15 @@ class FilmMakinesiProvider : MainAPI() {
             }
         }
 
+        // 2. Get player buttons with data-video_url (the actual attribute name used on the site)
+        doc.select("#player-section [data-video_url], .player-section [data-video_url], .video-parts [data-video_url]").forEach {
+            val src = it.attr("data-video_url")
+            if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
+                iframes.add(fixUrl(src))
+            }
+        }
+
+        // 3. Fallback: data-src, data-url, data-video in player section
         doc.select(".player-section [data-src], .player-section [data-url], [data-video]").forEach {
             val src = it.attr("data-src").ifEmpty { it.attr("data-url") }.ifEmpty { it.attr("data-video") }
             if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
@@ -239,57 +257,71 @@ class FilmMakinesiProvider : MainAPI() {
                     val embedDoc = app.get(sourceUrl, referer = data).text
 
                     val streamUrls = mutableListOf<String>()
+
+                    // Try dc_ decoder first (for closeload embeds)
                     val decodedStream = decodeStreamUrl(embedDoc)
                     if (decodedStream != null) {
                         streamUrls.add(decodedStream)
                     }
 
+                    // Also capture any direct m3u8/txt/mp4 URLs in the embed page
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
-                        if (!videoUrl.contains("player") && !videoUrl.contains("favicon")) {
+                        if (!videoUrl.contains("player") && !videoUrl.contains("favicon") && !videoUrl.contains(".vtt")) {
                             streamUrls.add(videoUrl)
                         }
                     }
 
+                    // Determine the correct referer for this embed
+                    val embedReferer = when {
+                        sourceUrl.contains("closeload") -> "https://closeload.filmmakinesi.to/"
+                        sourceUrl.contains("rapid") -> "https://rapid.filmmakinesi.to/"
+                        else -> "$mainUrl/"
+                    }
+
                     for (videoUrl in streamUrls.distinct()) {
                         val playerHeaders = mapOf(
-                            "Referer" to "https://closeload.filmmakinesi.to/",
+                            "Referer" to embedReferer,
                             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                         )
 
-                        // 1. Emit Master M3U8 URL directly (Ensures ExoPlayer loads audio track + video)
+                        // Emit Master M3U8 URL directly (ensures ExoPlayer loads audio + video)
                         val masterLink = newExtractorLink(
                             source = name,
                             name = "$name (Sesli Oynatıcı)",
                             url = videoUrl,
                             type = ExtractorLinkType.M3U8
                         ) {
-                            this.referer = "https://closeload.filmmakinesi.to/"
+                            this.referer = embedReferer
                             this.headers = playerHeaders
                             this.quality = Qualities.P1080.value
                         }
                         callback.invoke(masterLink)
 
-                        // 2. Also emit resolution sub-links as fallbacks
-                        val m3u8Links = M3u8Helper.generateM3u8(
-                            source = name,
-                            streamUrl = videoUrl,
-                            referer = "https://closeload.filmmakinesi.to/",
-                            headers = playerHeaders
-                        )
-                        m3u8Links.forEach { link ->
-                            val customLink = newExtractorLink(
-                                source = link.source,
-                                name = link.name,
-                                url = link.url,
-                                type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                            ) {
-                                this.referer = "https://closeload.filmmakinesi.to/"
-                                this.headers = playerHeaders
-                                this.quality = link.quality
+                        // Also emit resolution sub-links as fallbacks
+                        try {
+                            val m3u8Links = M3u8Helper.generateM3u8(
+                                source = name,
+                                streamUrl = videoUrl,
+                                referer = embedReferer,
+                                headers = playerHeaders
+                            )
+                            m3u8Links.forEach { link ->
+                                val customLink = newExtractorLink(
+                                    source = link.source,
+                                    name = link.name,
+                                    url = link.url,
+                                    type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                                ) {
+                                    this.referer = embedReferer
+                                    this.headers = playerHeaders
+                                    this.quality = link.quality
+                                }
+                                callback.invoke(customLink)
                             }
-                            callback.invoke(customLink)
+                        } catch (_: Exception) {
+                            // M3u8Helper might fail, master link already emitted
                         }
                     }
 
