@@ -8,46 +8,47 @@
 
 ### 🚀 Hızlı Kurulum (Tek Tıkla Ekle)
 
-Android cihazınızda CloudStream 3 yüklüyse, aşağıdaki butona veya bağlantıya tıklayarak depoyu doğrudan uygulamaya ekleyebilirsiniz:
+Android cihazınızda **CloudStream 3** yüklüyse, aşağıdaki butonlara veya bağlantılara tıklayarak depoyu doğrudan uygulamaya ekleyebilirsiniz:
 
 [![CloudStream'e Ekle](https://img.shields.io/badge/CloudStream-Depoyu%20Ekle-0080FF?style=for-the-badge&logo=android)](cloudstreamrepo://https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json)
 
-👉 **[Tek Tıkla Otomatik Depo Ekle](cloudstreamrepo://https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json)**
+👉 **[Tek Tıkla Otomatik Depo Ekle (Yöntem 1)](cloudstreamrepo://https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json)**
+
+👉 **[Tek Tıkla Otomatik Depo Ekle (Yöntem 2)](cloudstreamrepo://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json)**
 
 ---
 
-### 📱 Manuel Kurulum & Depo Adresleri
+### 📱 Manuel Kurulum & Çalışan Kısa Kodlar
 
-Android TV, Firestick veya manuel kurulum için:
+Android TV, Firestick veya el ile depo eklemek için:
 
 1. **CloudStream 3** uygulamasını açın.
 2. **Ayarlar (Settings ⚙️)** ➔ **Eklentiler (Extensions)** ➔ **Depo Ekle (Add Repository)** kısmına gidin.
-3. Aşağıdaki URL veya Kısa Kodu girin:
+3. Aşağıdaki **Kısa Kod** veya **Doğrudan Depo URL**'sini yapıştırın:
 
-| Yöntem | Kod / Bağlantı Adresi |
+| Kurulum Türü | Değer |
 | :--- | :--- |
-| **Direct Repos URL** | `https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json` |
-| **Shortcode / Kısa Kod** | `mrtdevm` |
+| **Kısa Kod (TinyURL)** | `tinyurl.com/mrtdevm-cs` |
+| **Doğrudan Depo URL** | `https://raw.githubusercontent.com/MRTDEVM/cloudstream-turkce/builds/repo.json` |
 
 ---
 
 ### 📦 Mevcut Eklentiler (Providers)
 
-| Sağlayıcı Adı | Durum | Sürüm | İçerik Türü | Orijinal Web Sitesi | Dil Desteği |
+| Sağlayıcı Adı | Durum | Sürüm | Seçenekler | İçerik Türü | Orijinal Web Sitesi |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **HDFilmCehennemi** | 🟢 Aktif | v7 | Film & Dizi | [hdfilmcehennemi.nl](https://www.hdfilmcehennemi.nl/) | TR Dublaj / Altyazı |
-| **FullHDFilmizlesene** | 🟢 Aktif | v7 | Film | [fullhdfilmizlesene.now](https://www.fullhdfilmizlesene.now/) | TR Dublaj / Altyazı |
-| **FilmMakinesi** | 🟢 Aktif | v7 | Film & Dizi | [filmmakinesi.to](https://filmmakinesi.to/) | TR Dublaj / Altyazı |
+| **HDFilmCehennemi** | 🟢 Aktif | v8 | TR Dublaj / Altyazılı / Dual | Film & Dizi | [hdfilmcehennemi.nl](https://www.hdfilmcehennemi.nl/) |
+| **FullHDFilmizlesene** | 🟢 Aktif | v8 | TR Dublaj / Altyazılı | Film | [fullhdfilmizlesene.now](https://www.fullhdfilmizlesene.now/) |
+| **FilmMakinesi** | 🟢 Aktif | v8 | TR Dublaj / Altyazılı | Film & Dizi | [filmmakinesi.to](https://filmmakinesi.to/) |
 
 ---
 
 ### ⚙️ Özellikler
 
-- ✅ **Full Ses & Akış Desteği:** ExoPlayer ile otomatik Master M3U8 ses ve video izi seçimi.
+- ✅ **Ses & Dil Seçenekleri:** Türkçe Dublaj, Türkçe Altyazılı ve Dual ses izi seçenekleri.
+- ✅ **Gelişmiş Altyazı Desteği:** VTT altyazı dosyaları ve ExoPlayer dahili ses/altyazı izi seçimi.
 - ✅ **Yüksek Kalite:** 1080p, 720p ve 4K akış desteği.
-- ✅ **Türkçe Dublaj & Altyazı:** Otomatik kaynak ve VTT altyazı çözümleme.
-- ✅ **Dizi & Sezon Takibi:** Sezon ve bölümlerin düzenli listelenmesi.
-- ✅ **Otomatik Güncelleme:** GitHub Actions sayesinde güncellemeler otomatik derlenir.
+- ✅ **Otomatik Güncelleme:** GitHub Actions ile siteler değiştikçe eklentiler otomatik derlenir.
 
 ---
 

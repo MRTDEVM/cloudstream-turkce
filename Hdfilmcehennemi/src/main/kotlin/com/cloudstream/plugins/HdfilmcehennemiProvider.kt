@@ -15,7 +15,7 @@ class HdfilmcehennemiProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "" to "Son Eklenen Filmler",
-        "yabancidiziizle-5/" to "Son Eklenen Diziler",
+        "dizi/" to "Son Eklenen Diziler",
         "category/tavsiye-filmler-izle2/" to "Tavsiye Filmler",
         "imdb-7-puan-uzeri-filmler-2/" to "IMDb 7+ Filmler"
     )
@@ -45,17 +45,19 @@ class HdfilmcehennemiProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val linkElem = if (this.tagName() == "a") this else this.selectFirst("a[href]") ?: return null
         val href = fixUrl(linkElem.attr("href"))
-        if (href == mainUrl || href.endsWith("/#") || href.contains("category/") || href.contains("/tur/")) return null
+        if (href == mainUrl || href.endsWith("/#") || href.contains("/category/") || href.contains("/tur/") || href.contains("/page/")) return null
 
-        val title = this.selectFirst(".poster-title, .mini-poster-title, .title")?.text()?.trim()
+        val title = this.selectFirst(".poster-title, .mini-poster-title, .title, h2, h3")?.text()?.trim()
             ?.ifEmpty { null }
             ?: linkElem.attr("title").trim().ifEmpty { null }
+            ?: linkElem.attr("aria-label").trim().ifEmpty { null }
             ?: return null
 
         val posterUrl = fixUrlNull(
-            this.selectFirst("img")?.attr("src")
+            this.selectFirst("img")?.attr("data-src")
                 ?.ifEmpty { null }
-                ?: this.selectFirst("img")?.attr("data-src")
+                ?: this.selectFirst("img")?.attr("src")
+                    ?.let { if (it.startsWith("data:")) null else it }
                 ?: this.selectFirst("img")?.attr("srcset")?.split(" ")?.firstOrNull()
         )
 
@@ -83,27 +85,29 @@ class HdfilmcehennemiProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val title = doc.selectFirst(".poster-title, h1, .movie-title, .title")?.text()?.trim()
+        val rawTitle = doc.selectFirst("h1, .poster-title, .movie-title")?.text()?.trim()
             ?: doc.selectFirst("meta[property='og:title']")?.attr("content")?.trim()
             ?: "Film"
+        val title = rawTitle.replace(Regex("""(?i)\s*(izle|film izle|hd film izle).*"""), "").trim()
 
         val posterUrl = fixUrlNull(
             doc.selectFirst("meta[property='og:image']")?.attr("content")
+                ?: doc.selectFirst(".poster-media img, .movie-poster img, .poster img")?.attr("data-src")
                 ?: doc.selectFirst(".poster-media img, .movie-poster img, .poster img")?.attr("src")
         )
         val description = doc.selectFirst(".movie-story, .story, .overview, p.description, .entry-content, .film-ozeti, .ozet, meta[name='description']")?.text()?.trim()
             ?: doc.selectFirst("meta[property='og:description']")?.attr("content")?.trim()
         val year = doc.selectFirst("a[href*='/yil/'], span.year, .release-date")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val score = Score.from10(doc.selectFirst(".imdb-score, .rating, .score")?.text()?.trim()?.replace(",", ".")?.toDoubleOrNull())
-        val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }
+        val tags = doc.select("a[href*='/tur/']").map { it.text().trim() }.filter { it.isNotEmpty() }
 
-        val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .episode-list").isNotEmpty()
+        val isTvSeries = url.contains("/dizi/") || doc.select(".season-wrapper, .episode-list, .season").isNotEmpty()
 
         return if (isTvSeries) {
             val episodes = mutableListOf<Episode>()
             doc.select(".season-wrapper, .season").forEachIndexed { seasonIdx, seasonElem ->
                 val seasonNum = seasonIdx + 1
-                seasonElem.select("a[href*='/bolum/'], .episode-item a").forEachIndexed { epIdx, epElem ->
+                seasonElem.select("a[href*='/bolum/'], .episode-item a, a[href*='/dizi/']").forEachIndexed { epIdx, epElem ->
                     val epUrl = fixUrl(epElem.attr("href"))
                     val epName = epElem.text().trim().ifEmpty { "Bolum ${epIdx + 1}" }
                     episodes.add(
@@ -134,12 +138,43 @@ class HdfilmcehennemiProvider : MainAPI() {
         }
     }
 
+    /**
+     * Unpack Dean Edwards packed JavaScript code p,a,c,k,e,d format
+     */
+    private fun unpackJs(packedCode: String): String {
+        val match = Regex("""\}\s*\(\s*'([\s\S]*?)'\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([\s\S]*?)'\.split\('\|'\)""").find(packedCode)
+            ?: return packedCode
+        val payload = match.groupValues[1]
+        val radix = match.groupValues[2].toIntOrNull() ?: 36
+        val syms = match.groupValues[4].split("|")
+        val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+        fun lookup(word: String): String {
+            var res = 0
+            for (c in word) {
+                val idx = chars.indexOf(c)
+                if (idx >= 0) {
+                    res = res * radix + idx
+                }
+            }
+            return if (res < syms.size && syms[res].isNotEmpty()) syms[res] else word
+        }
+
+        return Regex("""\b\w+\b""").replace(payload) { lookup(it.value) }
+    }
+
+    /**
+     * Generic decoder for closeload & rplayer dc_ functions.
+     * Dynamically detects operations (reverse, atob, rot, xor) from JS function body.
+     */
     private fun decodeStreamUrl(embedHtml: String): String? {
-        val callMatch = Regex("""dc_[A-Za-z0-9_]+\s*\(\s*\[(.*?)\]\s*\)""").find(embedHtml) ?: return null
+        val unpacked = unpackJs(embedHtml)
+
+        val callMatch = Regex("""dc_[A-Za-z0-9_]+\s*\(\s*\[(.*?)\]\s*\)""").find(unpacked) ?: return null
         val rawArray = callMatch.groupValues[1]
         val parts = rawArray.split(",").map { it.trim('"', '\'', ' ', ';') }
 
-        val funcMatch = Regex("""function\s+dc_[A-Za-z0-9_]+\s*\([^)]*\)\s*\{([\s\S]*?)(?:return\s+unmix;|return\s+result;)""").find(embedHtml) ?: return null
+        val funcMatch = Regex("""function\s+dc_[A-Za-z0-9_]+\s*\([^)]*\)\s*\{([\s\S]*?)(?:return\s+unmix;|return\s+result;)""").find(unpacked) ?: return null
         val body = funcMatch.groupValues[1]
 
         var curr = parts.joinToString("")
@@ -216,83 +251,125 @@ class HdfilmcehennemiProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val doc = app.get(data).document
+        val pageHtml = doc.html()
 
-        val iframes = mutableListOf<String>()
-        doc.select("iframe[src], iframe[data-src]").forEach {
-            val src = it.attr("src").ifEmpty { it.attr("data-src") }
-            if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
-                iframes.add(fixUrl(src))
-            }
-        }
+        val embedSources = mutableListOf<Pair<String, String>>() // Pair(embedUrl, label)
 
-        doc.select("button[data-source], a[data-source], .player-nav [data-url], [data-video]").forEach {
-            val rawSource = it.attr("data-source").ifEmpty { it.attr("data-url") }.ifEmpty { it.attr("data-video") }
-            if (rawSource.isNotEmpty() && !rawSource.contains("youtube.com") && !rawSource.contains("youtu.be")) {
-                if (rawSource.startsWith("http")) {
-                    iframes.add(rawSource)
-                } else if (rawSource.startsWith("//")) {
-                    iframes.add("https:$rawSource")
+        // 1. Check video alternatives (data-video) grouped by language container
+        val altDivs = doc.select(".alternative-links")
+        if (altDivs.isNotEmpty()) {
+            altDivs.forEach { div ->
+                val langAttr = div.attr("data-lang")
+                val langLabel = when (langAttr) {
+                    "tr" -> "Türkçe Dublaj"
+                    "en" -> "Türkçe Altyazılı"
+                    else -> "TR-EN Dual"
+                }
+
+                div.select("button[data-video], a[data-video]").forEach { btn ->
+                    val videoId = btn.attr("data-video")
+                    val btnName = btn.text().trim().ifEmpty { "Alternatif" }
+
+                    if (videoId.isNotEmpty()) {
+                        try {
+                            // Call AJAX endpoint /video/{id}/ to fetch JSON iframe
+                            val jsonUrl = "$mainUrl/video/$videoId/"
+                            val jsonResp = app.get(
+                                jsonUrl,
+                                referer = data,
+                                headers = mapOf("X-Requested-With" to "fetch", "Accept" to "application/json")
+                            ).text
+
+                            val iframeMatch = Regex("""data-src=\\"([^"\\]+)\\"|src=\\"([^"\\]+)\\"|data-src="([^"]+)"|src="([^"]+)"""").find(jsonResp)
+                            if (iframeMatch != null) {
+                                val rawIframe = (1..4).mapNotNull { iframeMatch.groups[it]?.value }.firstOrNull()
+                                if (!rawIframe.isNullOrEmpty()) {
+                                    val iframeUrl = fixUrl(rawIframe.replace("\\/", "/"))
+                                    embedSources.add(Pair(iframeUrl, "$langLabel ($btnName)"))
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // Ignore
+                        }
+                    }
                 }
             }
         }
 
-        for (sourceUrl in iframes.distinct()) {
+        // 2. Direct iframes in page if any
+        doc.select("iframe[src], iframe[data-src]").forEach {
+            val src = it.attr("src").ifEmpty { it.attr("data-src") }
+            if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
+                embedSources.add(Pair(fixUrl(src), "Varsayılan"))
+            }
+        }
+
+        for ((sourceUrl, optionLabel) in embedSources.distinctBy { it.first }) {
             try {
-                if (sourceUrl.contains("hdfilmcehennemi") || sourceUrl.contains("rapid") || sourceUrl.contains("closeload") || sourceUrl.contains("playmix")) {
+                if (sourceUrl.contains("hdfilmcehennemi") || sourceUrl.contains("rapid") || sourceUrl.contains("closeload") || sourceUrl.contains("playmix") || sourceUrl.contains("rplayer")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
 
                     val streamUrls = mutableListOf<String>()
+
+                    // Try dc_ decoder
                     val decodedStream = decodeStreamUrl(embedDoc)
                     if (decodedStream != null) {
                         streamUrls.add(decodedStream)
                     }
 
+                    // Direct m3u8/txt URLs in embed HTML
                     val m3u8Regex = Regex("""(https?://[^\s"'<>]+\.(?:m3u8|txt|mp4)[^\s"'<>]*)""")
                     m3u8Regex.findAll(embedDoc).forEach { match ->
                         val videoUrl = match.value.replace("\\/", "/")
-                        if (!videoUrl.contains("player") && !videoUrl.contains("favicon")) {
+                        if (!videoUrl.contains("player") && !videoUrl.contains("favicon") && !videoUrl.contains(".vtt")) {
                             streamUrls.add(videoUrl)
                         }
                     }
 
+                    val playerHeaders = mapOf(
+                        "Referer" to "https://hdfilmcehennemi.mobi/",
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    )
+
                     for (videoUrl in streamUrls.distinct()) {
-                        val playmixHeaders = mapOf(
-                            "Referer" to "https://hdfilmcehennemi.mobi/",
-                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                        )
+                        val streamName = "$name - $optionLabel (Sesli Oynatıcı)"
 
                         // 1. Emit Master M3U8 URL directly (Ensures ExoPlayer loads audio track + video)
                         val masterLink = newExtractorLink(
                             source = name,
-                            name = "$name (Sesli Oynatıcı)",
+                            name = streamName,
                             url = videoUrl,
                             type = ExtractorLinkType.M3U8
                         ) {
                             this.referer = "https://hdfilmcehennemi.mobi/"
-                            this.headers = playmixHeaders
+                            this.headers = playerHeaders
                             this.quality = Qualities.P1080.value
                         }
                         callback.invoke(masterLink)
 
-                        // 2. Also emit resolution sub-links as fallbacks
-                        val m3u8Links = M3u8Helper.generateM3u8(
-                            source = name,
-                            streamUrl = videoUrl,
-                            referer = "https://hdfilmcehennemi.mobi/",
-                            headers = playmixHeaders
-                        )
-                        m3u8Links.forEach { link ->
-                            val customLink = newExtractorLink(
-                                source = link.source,
-                                name = link.name,
-                                url = link.url,
-                                type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                            ) {
-                                this.referer = "https://hdfilmcehennemi.mobi/"
-                                this.headers = playmixHeaders
-                                this.quality = link.quality
+                        // 2. Resolution sub-links as fallbacks
+                        try {
+                            val m3u8Links = M3u8Helper.generateM3u8(
+                                source = name,
+                                streamUrl = videoUrl,
+                                referer = "https://hdfilmcehennemi.mobi/",
+                                headers = playerHeaders
+                            )
+                            m3u8Links.forEach { link ->
+                                val customLink = newExtractorLink(
+                                    source = link.source,
+                                    name = "$name - $optionLabel (${link.name})",
+                                    url = link.url,
+                                    type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                                ) {
+                                    this.referer = "https://hdfilmcehennemi.mobi/"
+                                    this.headers = playerHeaders
+                                    this.quality = link.quality
+                                }
+                                callback.invoke(customLink)
                             }
-                            callback.invoke(customLink)
+                        } catch (_: Exception) {
+                            // M3u8Helper fallback
                         }
                     }
 
