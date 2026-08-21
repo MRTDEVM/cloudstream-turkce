@@ -70,7 +70,8 @@ class FullHDFilmizleseneProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/arama/$query"
+        val encodedQuery = java.net.URLEncoder.encode(query, "utf-8")
+        val searchUrl = "$mainUrl/arama/$encodedQuery"
         val doc = app.get(searchUrl).document
 
         // Search page may use different card structure than main page
@@ -334,11 +335,14 @@ class FullHDFilmizleseneProvider : MainAPI() {
             // M3u8Helper might fail, master link already emitted
         }
 
-        // Extract VTT subtitles
-        val vttRegex = Regex("""\{"file":"([^"]+\.vtt[^"]*)","kind":"captions","label":"([^"]+)"\}""")
+        // Extract VTT subtitles - flexible regex for various JSON orderings
+        val vttRegex = Regex(""""file"\s*:\s*"([^"]+\.vtt[^"]*)".{0,50}?"label"\s*:\s*"([^"]+)"""")
         vttRegex.findAll(embedHtml).forEach { match ->
             val subUrl = match.groupValues[1].replace("\\/", "/")
             val subLang = match.groupValues[2]
+                .replace("\\u00fc", "ü").replace("\\u00e7", "ç")
+                .replace("\\u0131", "ı").replace("\\u00f6", "ö")
+                .trim()
             subtitleCallback.invoke(
                 SubtitleFile(
                     lang = subLang,

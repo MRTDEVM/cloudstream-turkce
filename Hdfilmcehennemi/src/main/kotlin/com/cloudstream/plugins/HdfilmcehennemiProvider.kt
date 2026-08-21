@@ -75,11 +75,39 @@ class HdfilmcehennemiProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/search/$query/"
-        val doc = app.get(searchUrl).document
-        return doc.select("a.poster, div.poster, div.mini-poster").mapNotNull {
-            it.toSearchResult()
-        }.distinctBy { it.url }
+        val searchUrl = "$mainUrl/search?q=${query}"
+        val jsonResp = app.get(
+            searchUrl,
+            referer = mainUrl,
+            headers = mapOf("X-Requested-With" to "fetch", "Accept" to "application/json")
+        ).text
+
+        val results = mutableListOf<SearchResponse>()
+        val combinedHtml = jsonResp
+            .replace("\\\"", "\"")
+            .replace("\\/", "/")
+            .replace("\\n", "\n")
+        val fragDoc = org.jsoup.Jsoup.parse(combinedHtml)
+        fragDoc.select("a[href*='hdfilmcehennemi']").forEach { link ->
+            val href = fixUrl(link.attr("href"))
+            if (!href.contains("/category/") && !href.contains("/tur/") && href != mainUrl) {
+                val title = link.selectFirst("strong, .title, h3, h4")?.text()?.trim()
+                    ?: link.attr("title").trim()
+                val poster = fixUrlNull(
+                    link.selectFirst("img")?.attr("data-src")
+                        ?: link.selectFirst("img")?.attr("src")?.let { if (it.startsWith("data:")) null else it }
+                )
+                if (title.isNotEmpty()) {
+                    val isSeries = href.contains("/dizi/")
+                    if (isSeries) {
+                        results.add(newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = poster })
+                    } else {
+                        results.add(newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = poster })
+                    }
+                }
+            }
+        }
+        return results.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -280,9 +308,9 @@ class HdfilmcehennemiProvider : MainAPI() {
                                 headers = mapOf("X-Requested-With" to "fetch", "Accept" to "application/json")
                             ).text
 
-                            val iframeMatch = Regex("""data-src=\\"([^"\\]+)\\"|src=\\"([^"\\]+)\\"|data-src="([^"]+)"|src="([^"]+)"""").find(jsonResp)
+                            val iframeMatch = Regex("""(?:data-src|src)\\?=\\?"([^"\\]+)""").find(jsonResp)
                             if (iframeMatch != null) {
-                                val rawIframe = (1..4).mapNotNull { iframeMatch.groups[it]?.value }.firstOrNull()
+                                val rawIframe = iframeMatch.groupValues[1]
                                 if (!rawIframe.isNullOrEmpty()) {
                                     val iframeUrl = fixUrl(rawIframe.replace("\\/", "/"))
                                     embedSources.add(Pair(iframeUrl, "$langLabel ($btnName)"))
@@ -373,11 +401,13 @@ class HdfilmcehennemiProvider : MainAPI() {
                         }
                     }
 
-                    // VTT Subtitles
-                    val vttRegex = Regex("""\{"file":"([^"]+\.vtt[^"]*)","kind":"captions","label":"([^"]+)"\}""")
+                    // VTT Subtitles - flexible regex for various JSON orderings
+                    val vttRegex = Regex(""""file"\s*:\s*"([^"]+\.vtt[^"]*)".{0,50}?"label"\s*:\s*"([^"]+)"""")
                     vttRegex.findAll(embedDoc).forEach { match ->
                         val subUrl = match.groupValues[1].replace("\\/", "/")
                         val subLang = match.groupValues[2]
+                            .replace("\\u00fc", "ü").replace("\\u00e7", "ç")
+                            .replace("\\u0131", "ı").replace("\\u00f6", "ö")
                         subtitleCallback.invoke(
                             SubtitleFile(
                                 lang = subLang,

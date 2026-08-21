@@ -225,13 +225,13 @@ class FilmMakinesiProvider : MainAPI() {
     ): Boolean {
         val doc = app.get(data).document
 
-        val iframes = mutableListOf<String>()
+        val iframes = mutableListOf<Pair<String, String>>()
 
         // 1. Get iframes (lazy-loaded with data-src)
         doc.select("iframe[src], iframe[data-src]").forEach {
             val src = it.attr("src").ifEmpty { it.attr("data-src") }
             if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
-                iframes.add(fixUrl(src))
+                iframes.add(Pair(fixUrl(src), "Varsayılan"))
             }
         }
 
@@ -239,7 +239,8 @@ class FilmMakinesiProvider : MainAPI() {
         doc.select("#player-section [data-video_url], .player-section [data-video_url], .video-parts [data-video_url]").forEach {
             val src = it.attr("data-video_url")
             if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
-                iframes.add(fixUrl(src))
+                val btnName = it.text().trim().ifEmpty { "Alternatif" }
+                iframes.add(Pair(fixUrl(src), btnName))
             }
         }
 
@@ -247,11 +248,12 @@ class FilmMakinesiProvider : MainAPI() {
         doc.select(".player-section [data-src], .player-section [data-url], [data-video]").forEach {
             val src = it.attr("data-src").ifEmpty { it.attr("data-url") }.ifEmpty { it.attr("data-video") }
             if (src.isNotEmpty() && !src.contains("youtube.com") && !src.contains("youtu.be")) {
-                iframes.add(fixUrl(src))
+                val btnName = it.text().trim().ifEmpty { "Alternatif" }
+                iframes.add(Pair(fixUrl(src), btnName))
             }
         }
 
-        for (sourceUrl in iframes.distinct()) {
+        for ((sourceUrl, labelName) in iframes.distinctBy { it.first }) {
             try {
                 if (sourceUrl.contains("closeload") || sourceUrl.contains("filmmakinesi") || sourceUrl.contains("playmix") || sourceUrl.contains("rapid")) {
                     val embedDoc = app.get(sourceUrl, referer = data).text
@@ -289,7 +291,7 @@ class FilmMakinesiProvider : MainAPI() {
                         // Emit Master M3U8 URL directly (ensures ExoPlayer loads audio + video)
                         val masterLink = newExtractorLink(
                             source = name,
-                            name = "$name (Sesli Oynatıcı)",
+                            name = "$name - $labelName",
                             url = videoUrl,
                             type = ExtractorLinkType.M3U8
                         ) {
@@ -310,7 +312,7 @@ class FilmMakinesiProvider : MainAPI() {
                             m3u8Links.forEach { link ->
                                 val customLink = newExtractorLink(
                                     source = link.source,
-                                    name = link.name,
+                                    name = "$name - $labelName (${link.name})",
                                     url = link.url,
                                     type = if (link.isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                                 ) {
@@ -325,11 +327,13 @@ class FilmMakinesiProvider : MainAPI() {
                         }
                     }
 
-                    // VTT Subtitles
-                    val vttRegex = Regex("""\{"file":"([^"]+\.vtt[^"]*)","kind":"captions","label":"([^"]+)"\}""")
+                    // VTT Subtitles - flexible regex for various JSON orderings
+                    val vttRegex = Regex(""""file"\s*:\s*"([^"]+\.vtt[^"]*)".{0,50}?"label"\s*:\s*"([^"]+)"""")
                     vttRegex.findAll(embedDoc).forEach { match ->
                         val subUrl = match.groupValues[1].replace("\\/", "/")
                         val subLang = match.groupValues[2]
+                            .replace("\\u00fc", "ü").replace("\\u00e7", "ç")
+                            .replace("\\u0131", "ı").replace("\\u00f6", "ö")
                         subtitleCallback.invoke(
                             SubtitleFile(
                                 lang = subLang,
