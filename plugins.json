@@ -1,10 +1,10 @@
 [
     {
         "iconUrl": "https://filmmakinesi.to/favicon.ico",
-        "fileHash": "sha256-2da9cd05fd7efc426c302666ab80f84d76e5ac8146f4cb3cc43d5fcbb84182d2",
+        "fileHash": "sha256-5e04801e2836c9ee79a35fb98d0c5ccc4406328cabea600ed4112461c00f72ef",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/MRTDEVM/cloudstream-turkce",
-        "fileSize": 22788,
+        "fileSize": 23899,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -22,10 +22,10 @@
     },
     {
         "iconUrl": "https://www.fullhdfilmizlesene.now/favicon.ico",
-        "fileHash": "sha256-2004ad427acd59d7c72390f4792448bd7cd8f352edaabe15907d86cbc6decd9c",
+        "fileHash": "sha256-f8fa5d0f87bef94d2110a453c2297adb63be065548d30d69cbedb0b4cfdd670a",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/MRTDEVM/cloudstream-turkce",
-        "fileSize": 18514,
+        "fileSize": 18682,
         "status": 1,
         "language": "tr",
         "authors": [
@@ -42,10 +42,10 @@
     },
     {
         "iconUrl": "https://www.hdfilmcehennemi.nl/favicon.ico",
-        "fileHash": "sha256-7605b9b1aa873f683bfb05c525a92763681df10346c662a9fd2999eb5403f604",
+        "fileHash": "sha256-87a9083a8a6ee61d90b9c5376acefb41e1f4f194fc0ad7d107dfaa0792e75684",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/MRTDEVM/cloudstream-turkce",
-        "fileSize": 26253,
+        "fileSize": 26700,
         "status": 1,
         "language": "tr",
         "authors": [
